@@ -1,0 +1,9 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = Header;
+const jsx_runtime_1 = require("react/jsx-runtime");
+const lucide_react_1 = require("lucide-react");
+function Header() {
+    return ((0, jsx_runtime_1.jsxs)("header", { className: "flex h-16 items-center justify-between border-b border-slate-200 bg-white px-8", children: [(0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h1", { className: "text-2xl font-bold text-slate-900", children: "Dashboard" }), (0, jsx_runtime_1.jsx)("p", { className: "text-sm text-slate-500", children: "Welcome back, Super Admin" })] }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-4", children: [(0, jsx_runtime_1.jsxs)("div", { className: "relative", children: [(0, jsx_runtime_1.jsx)(lucide_react_1.Search, { size: 18, className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" }), (0, jsx_runtime_1.jsx)("input", { type: "text", placeholder: "Search...", className: "h-10 w-72 rounded-xl border border-slate-200 pl-10 pr-4 outline-none focus:border-emerald-500" })] }), (0, jsx_runtime_1.jsx)("button", { className: "flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-100", children: (0, jsx_runtime_1.jsx)(lucide_react_1.Bell, { size: 18 }) }), (0, jsx_runtime_1.jsxs)("div", { className: "flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2", children: [(0, jsx_runtime_1.jsx)("div", { className: "flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 font-bold text-white", children: "A" }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("p", { className: "text-sm font-semibold", children: "Super Admin" }), (0, jsx_runtime_1.jsx)("p", { className: "text-xs text-slate-500", children: "Administrator" })] })] })] })] }));
+}
+//# sourceMappingURL=Header.js.map
