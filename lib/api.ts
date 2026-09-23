@@ -459,6 +459,12 @@ export interface Serial {
   serialNumber: string;
   status: string;
 
+  rejectReason?: string | null;
+  rejectedAt?: string | null;
+  rejectedById?: string | null;
+  rejectApprovedAt?: string | null;
+  rejectApprovedById?: string | null;
+
   productId?: string | null;
   product?: Product | null;
 
@@ -682,4 +688,754 @@ export async function approveSerialReject(
   }
 
   return response.json();
+}
+
+/* ======================================================
+   DASHBOARD
+   ====================================================== */
+
+export interface DashboardActivity {
+  id: string;
+  action: string;
+  module: string;
+  recordId: string | null;
+  oldValue: unknown;
+  newValue: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    username: string;
+  } | null;
+}
+
+export interface DashboardSummary {
+  products: {
+    total: number;
+  };
+
+  serials: {
+    total: number;
+    inStock: number;
+    shipped: number;
+    rejectPending: number;
+    rejected: number;
+  };
+
+  dealers: {
+    total: number;
+  };
+
+  shipments: {
+    total: number;
+  };
+
+  warranty: {
+    active: number;
+  };
+
+  returns: {
+    pending: number;
+  };
+
+  recentActivity: DashboardActivity[];
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const response = await fetch(
+    `${API_BASE_URL}/dashboard/summary`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to load dashboard summary.",
+    );
+  }
+
+  return await response.json();
+}
+
+export interface Shipment {
+  id: string;
+  shipmentNo: string;
+  dealerId: string;
+  shipmentDate: string;
+  status: string;
+  remarks: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShipmentItem {
+  id: string;
+  shipmentId: string;
+  productId: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+  product?: Product;
+}
+
+export interface CreateShipmentInput {
+  shipmentNo: string;
+  dealerId: string;
+  shipmentDate: string;
+  remarks?: string;
+}
+
+export interface UpdateShipmentInput {
+  shipmentNo?: string;
+  dealerId?: string;
+  shipmentDate?: string;
+  remarks?: string;
+}
+
+export interface CreateShipmentItemInput {
+  productId: string;
+  quantity: number;
+}
+
+export interface GenerateSerialsInput {
+  quantity: number;
+}
+
+export async function getShipments(): Promise<Shipment[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to load shipments.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function getShipment(
+  id: string,
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${id}`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to load shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function getShipmentItems(
+  id: string,
+): Promise<ShipmentItem[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${id}/items`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to load shipment items.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function createShipment(
+  data: CreateShipmentInput,
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to create shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function updateShipment(
+  id: string,
+  data: UpdateShipmentInput,
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${id}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to update shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function deleteShipment(
+  id: string,
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${id}`,
+    {
+      method: "DELETE",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to delete shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function addShipmentItem(
+  shipmentId: string,
+  data: CreateShipmentItemInput,
+): Promise<ShipmentItem> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${shipmentId}/items`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to add shipment item.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function generateShipmentSerials(
+  shipmentItemId: string,
+  data: GenerateSerialsInput,
+): Promise<Serial[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${shipmentItemId}/serials`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to generate serials.",
+    );
+  }
+
+  return await response.json();
+}
+
+/* ======================================================
+   WEBSITE CMS
+   ====================================================== */
+
+export interface WebsiteProductImage {
+  id: string;
+  imageUrl: string;
+  altText?: string | null;
+  sortOrder: number;
+}
+
+export interface WebsiteProductItem {
+  id: string;
+  categoryId: string;
+  title: string;
+  slug?: string | null;
+  description?: string | null;
+  mainImage: string;
+  specificationImage?: string | null;
+  isPublished: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  images: WebsiteProductImage[];
+}
+
+export interface WebsiteProductCategory {
+  id: string;
+  title: string;
+  slug: string;
+  heading?: string | null;
+  description: string[];
+  heroImage?: string | null;
+  overviewImage?: string | null;
+  overviewTitle?: string | null;
+  overviewDescription?: string | null;
+  contentType: string;
+  isPublished: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  products: WebsiteProductItem[];
+}
+
+export interface CreateWebsiteProductCategoryData {
+  title: string;
+  slug: string;
+  heading?: string;
+  description: string[];
+  heroImage?: string;
+  overviewImage?: string;
+  overviewTitle?: string;
+  overviewDescription?: string;
+  contentType?: string;
+  isPublished?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateWebsiteProductCategoryData
+  extends Partial<CreateWebsiteProductCategoryData> {}
+
+export interface CreateWebsiteProductData {
+  categoryId: string;
+  title: string;
+  slug?: string;
+  description?: string;
+  mainImage: string;
+  specificationImage?: string;
+  isPublished?: boolean;
+  sortOrder?: number;
+  images?: {
+    imageUrl: string;
+    altText?: string;
+    sortOrder?: number;
+  }[];
+}
+
+export interface UpdateWebsiteProductData
+  extends Partial<CreateWebsiteProductData> {}
+
+export async function getWebsiteProductCategories(): Promise<
+  WebsiteProductCategory[]
+> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/categories`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Unable to load website product categories.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function createWebsiteProductCategory(
+  data: CreateWebsiteProductCategoryData,
+): Promise<WebsiteProductCategory> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/categories`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to create website product category.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function updateWebsiteProductCategory(
+  id: string,
+  data: UpdateWebsiteProductCategoryData,
+): Promise<WebsiteProductCategory> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/categories/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to update website product category.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function createWebsiteProduct(
+  data: CreateWebsiteProductData,
+): Promise<WebsiteProductItem> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/products`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to create website product.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function updateWebsiteProduct(
+  id: string,
+  data: UpdateWebsiteProductData,
+): Promise<WebsiteProductItem> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/products/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to update website product.",
+    );
+  }
+
+  return await response.json();
+}
+
+export interface WebsiteProject {
+  id: string;
+  category: string;
+  title: string;
+  location: string;
+  capacity: string;
+  panels: string;
+  inverter: string;
+  battery: string;
+  image: string;
+  isPublished: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateWebsiteProjectData {
+  category: string;
+  title: string;
+  location: string;
+  capacity: string;
+  panels: string;
+  inverter: string;
+  battery: string;
+  image: string;
+  isPublished?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateWebsiteProjectData
+  extends Partial<CreateWebsiteProjectData> {}
+
+export async function getWebsiteProjects(): Promise<
+  WebsiteProject[]
+> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/projects`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Unable to load website projects.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function createWebsiteProject(
+  data: CreateWebsiteProjectData,
+): Promise<WebsiteProject> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/projects`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to create website project.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function updateWebsiteProject(
+  id: string,
+  data: UpdateWebsiteProjectData,
+): Promise<WebsiteProject> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/projects/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to update website project.",
+    );
+  }
+
+  return await response.json();
+}
+
+export interface WebsiteAd {
+  id: string;
+  slot: number;
+  image: string;
+  isPublished: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function getWebsiteAds(): Promise<WebsiteAd[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/ads`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Unable to load website ads.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function createWebsiteAd(
+  slot: number,
+  image: string,
+): Promise<WebsiteAd> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/ads`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        slot,
+        image,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to create website ad.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function updateWebsiteAd(
+  id: string,
+  image: string,
+  isPublished?: boolean,
+): Promise<WebsiteAd> {
+  const response = await fetch(
+    `${API_BASE_URL}/website-cms/ads/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        image,
+        isPublished,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+
+    throw new Error(
+      errorData?.message ||
+        "Unable to update website ad.",
+    );
+  }
+
+  return await response.json();
 }

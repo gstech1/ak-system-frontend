@@ -12,8 +12,9 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 
+import DashboardShell from "@/components/layout/DashboardShell";
+import PageTitle from "@/components/common/PageTitle";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
@@ -45,7 +46,7 @@ const OFFICE_ROLES: UserRole[] = [
 
 export default function UsersPage() {
 
-const router = useRouter();
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -139,15 +140,8 @@ const [editingUser, setEditingUser] = useState<User | null>(null);
   }
 
     useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
-    loadUsers();
-  }, [router]);
+  loadUsers();
+}, []);
 
   function openCreateUser() {
     setErrorMessage("");
@@ -574,17 +568,12 @@ function openEditUser(user: User) {
   ).length;
 
   return (
-  <main className="min-h-screen bg-slate-100 p-6">
-    <div className="mx-auto max-w-7xl">
-
-      <div className="mb-4">
-        <a
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-        >
-          ← Back to Dashboard
-        </a>
-      </div>
+  <DashboardShell>
+    <div className="space-y-6">
+      <PageTitle
+        title="User Management"
+        subtitle="Manage Office and Dealer accounts."
+      />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1244,6 +1233,6 @@ function openEditUser(user: User) {
           </div>
         </div>
       )}
-    </main>
+    </DashboardShell>
   );
 }

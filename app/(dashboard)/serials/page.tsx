@@ -22,6 +22,8 @@ import {
 } from "@zxing/browser";
 
 import PermissionGuard from "@/components/auth/PermissionGuard";
+import DashboardShell from "@/components/layout/DashboardShell";
+import PageTitle from "@/components/common/PageTitle";
 
 function formatSerial(serial: string) {
   const value = serial.replace(/\s+/g, "");
@@ -585,7 +587,25 @@ export default function SerialsPage() {
     }
   }
 
+  function formatProductCompact(product: Product) {
+  const type =
+    product.category ||
+    product.name ||
+    product.productCode;
+
+  const specs = [
+    product.ratedCurrent,
+    product.ratedVoltage,
+    product.poles
+      ? `${product.poles}P`
+      : null,
+  ].filter(Boolean);
+
+  return `${type} · ${specs.join(" · ")}`;
+}
+
   return (
+  <DashboardShell>
     <PermissionGuard permission="SERIALS_VIEW">
       <div className="space-y-6">
 
@@ -722,35 +742,30 @@ export default function SerialsPage() {
         )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Serial Numbers
-          </h1>
+<div className="flex items-center justify-between">
+  <PageTitle
+    title="Serial Numbers"
+    subtitle="Register and manage warehouse serial numbers."
+  />
 
-          <p className="mt-1 text-sm text-slate-500">
-            Register and manage warehouse serial numbers.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-  setError("");
-  setSuccess("");
-  setProductId("");
-  setStartSerial("");
-  setEndSerial("");
-  setScanTarget(null);
-  scanTargetRef.current = null;
-  setScannerOpen(false);
-  setShowForm(true);
-}}
-          className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700"
-        >
-          + Register Serial
-        </button>
-      </div>
+  <button
+    type="button"
+    onClick={() => {
+      setError("");
+      setSuccess("");
+      setProductId("");
+      setStartSerial("");
+      setEndSerial("");
+      setScanTarget(null);
+      scanTargetRef.current = null;
+      setScannerOpen(false);
+      setShowForm(true);
+    }}
+    className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700"
+  >
+    + Register Serial
+  </button>
+</div>
 
       {/* Messages */}
       {error && (
@@ -782,47 +797,7 @@ export default function SerialsPage() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-            {/* Product */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Product
-              </label>
-
-              <select
-  value={productId}
-  onChange={(event) => {
-    setProductId(event.target.value);
-    setError("");
-  }}
-  className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
->
-  <option value="">
-    Select Product
-  </option>
-
-  {products.map((product) => (
-    <option
-      key={product.id}
-      value={product.id}
-    >
-      {product.productCode} — {product.name}
-    </option>
-  ))}
-</select>
-
-{selectedProduct && (
-  <div className="mt-2 text-sm font-semibold text-slate-700">
-    {selectedProduct.poles
-      ? `${selectedProduct.poles}P`
-      : "-"}{" "}
-    · {selectedProduct.ratedCurrent || "-"}{" "}
-    · {selectedProduct.ratedVoltage || "-"}{" "}
-    · {selectedProduct.breakingCapacity || "-"}{" "}
-    · {selectedProduct.warrantyMonths} Months
-  </div>
-)}
-            </div>
-
+         
                {/* Serial Range */}
               <div className="grid gap-5 md:grid-cols-2">
                 {/* Start Serial */}
@@ -969,7 +944,7 @@ export default function SerialsPage() {
         </div>
       )}
 
-     {/* Serial List */}
+   {/* Serial List */}
 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
   <div className="border-b border-slate-200 px-6 py-4">
     <h2 className="font-bold text-slate-900">
@@ -1023,136 +998,133 @@ export default function SerialsPage() {
               serial.shipmentItem?.product;
 
             return (
-              <tr
-                key={serial.id}
-                className="hover:bg-slate-50"
-              >
-                {/* Serial Number */}
-                <td className="px-5 py-4 font-mono font-semibold text-slate-900">
-                  {formatSerial(
-                    serial.serialNumber,
-                  )}
-                </td>
+  <tr
+    key={serial.id}
+    className="hover:bg-slate-50"
+  >
+    {/* Serial Number */}
+    <td className="px-5 py-4 font-mono font-semibold text-slate-900">
+      {formatSerial(serial.serialNumber)}
+    </td>
 
-                {/* Product */}
-                <td className="px-5 py-4 text-sm text-slate-700">
-                  {product ? (
-                    <>
-                      {product.productCode} —{" "}
-                      {product.name}
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </td>
+    {/* Product */}
+    <td className="px-5 py-4 text-sm text-slate-700">
+      {serial.status === "REJECTED" ? (
+        <span className="font-semibold text-red-600">
+          REJECTED
+        </span>
+      ) : serial.status === "REJECT_PENDING" ? (
+        <span className="font-semibold text-amber-600">
+          REJECT PENDING
+        </span>
+      ) : product ? (
+        <span className="whitespace-nowrap">
+          {formatProductCompact(product)}
+        </span>
+      ) : (
+        "—"
+      )}
+    </td>
 
-                {/* Received */}
-                <td className="px-5 py-4 text-sm text-slate-600">
-                  {serial.receivedAt
-                    ? new Date(
-                        serial.receivedAt,
-                      ).toLocaleDateString()
-                    : serial.createdAt
-                      ? new Date(
-                          serial.createdAt,
-                        ).toLocaleDateString()
-                      : "-"}
-                </td>
+    {/* Received */}
+    <td className="px-5 py-4 text-sm text-slate-600">
+      {serial.receivedAt
+        ? new Date(
+            serial.receivedAt,
+          ).toLocaleDateString()
+        : "-"}
+    </td>
 
-                {/* Shipped */}
-                <td className="px-5 py-4 text-sm text-slate-600">
-                  {serial.shippedAt
-                    ? new Date(
-                        serial.shippedAt,
-                      ).toLocaleDateString()
-                    : "-"}
-                </td>
+    {/* Shipped */}
+    <td className="px-5 py-4 text-sm text-slate-600">
+      {serial.shippedAt
+        ? new Date(
+            serial.shippedAt,
+          ).toLocaleDateString()
+        : "-"}
+    </td>
 
-                {/* Status */}
-                <td className="px-5 py-4">
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                      serial.status === "REJECTED"
-                        ? "bg-red-100 text-red-700"
-                        : serial.status ===
-                            "REJECT_PENDING"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-emerald-100 text-emerald-700"
-                    }`}
-                  >
-                    {serial.status}
-                  </span>
-                </td>
+    {/* Status */}
+    <td className="px-5 py-4">
+      <span
+        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+          serial.status === "REJECTED"
+            ? "bg-red-100 text-red-700"
+            : serial.status ===
+                "REJECT_PENDING"
+              ? "bg-amber-100 text-amber-700"
+              : "bg-emerald-100 text-emerald-700"
+        }`}
+      >
+        {serial.status}
+      </span>
+    </td>
 
-                {/* Actions */}
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-2">
-                    {(
-                      serial.status === "IN_STOCK" ||
-                      serial.status === "REGISTERED"
-                    ) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRejectSerialItem(
-                            serial,
-                          );
-                          setRejectReason("");
-                          setRejectError("");
-                          setRejectSuccess("");
-                        }}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
-                      >
-                        Reject
-                      </button>
-                    )}
+    {/* Actions */}
+    <td className="px-5 py-4">
+      <div className="flex items-center gap-2">
+        {(serial.status === "IN_STOCK" ||
+          serial.status === "REGISTERED") && (
+          <button
+            type="button"
+            onClick={() => {
+              setRejectSerialItem(serial);
+              setRejectReason("");
+              setRejectError("");
+              setRejectSuccess("");
+            }}
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+          >
+            Reject
+          </button>
+        )}
 
-                    {serial.status ===
-                      "REJECT_PENDING" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleApproveReject(
-                            serial.serialNumber,
-                          )
-                        }
-                        disabled={rejectSaving}
-                        className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {rejectSaving
-                          ? "Approving..."
-                          : "Approve Reject"}
-                      </button>
-                    )}
+        {serial.status ===
+          "REJECT_PENDING" && (
+          <button
+            type="button"
+            onClick={() =>
+              handleApproveReject(
+                serial.serialNumber,
+              )
+            }
+            disabled={rejectSaving}
+            className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {rejectSaving
+              ? "Approving..."
+              : "Approve Reject"}
+          </button>
+        )}
 
-                    {serial.status ===
-                      "REJECTED" && (
-                      <span className="text-xs font-semibold text-slate-400">
-                        Rejected
-                      </span>
-                    )}
+        {serial.status === "REJECTED" && (
+          <span className="text-xs font-semibold text-slate-400">
+            Rejected
+          </span>
+        )}
 
-                    {![
-                      "IN_STOCK",
-                      "REGISTERED",
-                      "REJECT_PENDING",
-                      "REJECTED",
-                    ].includes(serial.status) && (
-                      <span className="text-xs text-slate-400">
-                        —
-                      </span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-                </tbody>
+        {![
+          "IN_STOCK",
+          "REGISTERED",
+          "REJECT_PENDING",
+          "REJECTED",
+        ].includes(serial.status) && (
+          <span className="text-xs text-slate-400">
+            —
+          </span>
+        )}
+      </div>
+    </td>
+  </tr>
+);
+            })}
+        </tbody>
       </table>
     </div>
   )}
 </div>
-    </div>
-  </PermissionGuard>
-  );
+            </div>
+    </PermissionGuard>
+  </DashboardShell>
+);
 }

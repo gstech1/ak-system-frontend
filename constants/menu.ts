@@ -1,68 +1,104 @@
 import {
   LayoutDashboard,
-  Newspaper,
+  Package,
   BriefcaseBusiness,
-  Building2,
-  MapPinned,
-  Image,
+  Megaphone,
   Users,
   ScanBarcode,
+  ClipboardCheck,
+  Truck,
+  Store,
+  ShieldCheck,
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
   {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    permission: "DASHBOARD_VIEW",
+    section: "MAIN",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        permission: "DASHBOARD_VIEW",
+      },
+    ],
   },
 
   {
-    title: "News",
-    href: "/news",
-    icon: Newspaper,
-    permission: "WEBSITE_MANAGEMENT",
+    section: "WEBSITE",
+    items: [
+      {
+        title: "Products",
+        href: "/website-management/products",
+        icon: Package,
+        permission: "WEBSITE_MANAGEMENT",
+      },
+
+      {
+        title: "Projects",
+        href: "/projects",
+        icon: BriefcaseBusiness,
+        permission: "WEBSITE_MANAGEMENT",
+      },
+
+      {
+        title: "Ads & Promotions",
+        href: "/website-management/ads",
+        icon: Megaphone,
+        permission: "WEBSITE_MANAGEMENT",
+      },
+    ],
   },
 
   {
-    title: "Projects",
-    href: "/projects",
-    icon: BriefcaseBusiness,
-    permission: "WEBSITE_MANAGEMENT",
+    section: "SWMS",
+    items: [
+      {
+        title: "Serial Management",
+        href: "/serials",
+        icon: ScanBarcode,
+        permission: "SERIALS_VIEW",
+      },
+
+      {
+        title: "Reject Approvals",
+        href: "/serials/reject-approvals",
+        icon: ClipboardCheck,
+        permission: "SERIALS_MANAGE",
+      },
+
+      {
+        title: "Shipments",
+        href: "/shipments",
+        icon: Truck,
+        permission: "SHIPMENTS_VIEW",
+      },
+
+      {
+        title: "Dealers",
+        href: "/dealers",
+        icon: Store,
+        permission: "DEALERS_VIEW",
+      },
+
+      {
+        title: "Warranty",
+        href: "/management/warranty",
+        icon: ShieldCheck,
+        permission: "WARRANTY_VIEW",
+      },
+    ],
   },
 
   {
-    title: "Company",
-    href: "/company",
-    icon: Building2,
-    permission: "WEBSITE_MANAGEMENT",
-  },
-
-  {
-    title: "Dealer Locator",
-    href: "/dealers",
-    icon: MapPinned,
-    permission: "DEALERS_VIEW",
-  },
-
-  {
-    title: "Media Library",
-    href: "/media",
-    icon: Image,
-    permission: "WEBSITE_MANAGEMENT",
-  },
-
-  {
-    title: "User Management",
-    href: "/users",
-    icon: Users,
-    permission: "USERS_VIEW",
-  },
-
-  {
-    title: "Serial Management",
-    href: "/serials",
-    icon: ScanBarcode,
-    permission: "SERIALS_VIEW",
+    section: "SYSTEM",
+    items: [
+      {
+        title: "User Management",
+        href: "/users",
+        icon: Users,
+        permission: "USERS_VIEW",
+      },
+    ],
   },
 ] as const;

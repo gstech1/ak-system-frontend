@@ -15,7 +15,7 @@ export default function StatCard({
 
       <div className="relative flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             {title}
           </p>
 
@@ -23,15 +23,15 @@ export default function StatCard({
             {value}
           </h2>
 
-          <p className="mt-3 text-sm font-medium text-emerald-600">
-            +12% This Month
+          <p className="mt-3 text-xs font-medium text-slate-400">
+            Current System Status
           </p>
         </div>
 
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 transition-all group-hover:bg-emerald-600">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 transition-all duration-300 group-hover:bg-emerald-600">
           <ChevronRight
             size={24}
-            className="text-emerald-600 group-hover:text-white"
+            className="text-emerald-600 transition-colors duration-300 group-hover:text-white"
           />
         </div>
       </div>

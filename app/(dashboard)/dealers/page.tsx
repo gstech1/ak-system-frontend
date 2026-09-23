@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
+import DashboardShell from "@/components/layout/DashboardShell";
+import PageTitle from "@/components/common/PageTitle";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -526,29 +527,14 @@ export default function DealersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+  <DashboardShell>
+    <div className="mx-auto max-w-7xl space-y-6">
 
-        <div>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-          >
-            ← Back to Dashboard
-          </Link>
-        </div>
-
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Dealer Management
-            </h1>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Manage Dealer information, login accounts,
-              passwords and account status.
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <PageTitle
+          title="Dealer Management"
+          subtitle="Manage Dealer information, login accounts, passwords and account status."
+        />
 
           <button
             type="button"
@@ -1311,7 +1297,7 @@ export default function DealersPage() {
           </form>
         </Modal>
       )}
-    </main>
+    </DashboardShell>
   );
 }
 
