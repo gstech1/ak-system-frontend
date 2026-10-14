@@ -9,6 +9,7 @@ import {
   Truck,
   Store,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 
 export const SIDEBAR_MENU = [
@@ -28,22 +29,22 @@ export const SIDEBAR_MENU = [
     section: "WEBSITE",
     items: [
       {
-        title: "Products",
-        href: "/website-management/products",
+        title: "Website Products",
+        href: "/dashboard/website/products",
         icon: Package,
         permission: "WEBSITE_MANAGEMENT",
       },
 
       {
         title: "Projects",
-        href: "/projects",
+        href: "/dashboard/website/projects",
         icon: BriefcaseBusiness,
         permission: "WEBSITE_MANAGEMENT",
       },
 
       {
         title: "Ads & Promotions",
-        href: "/website-management/ads",
+        href: "/dashboard/website/ads",
         icon: Megaphone,
         permission: "WEBSITE_MANAGEMENT",
       },
@@ -53,6 +54,13 @@ export const SIDEBAR_MENU = [
   {
     section: "SWMS",
     items: [
+      {
+        title: "Product Catalog",
+        href: "/products",
+        icon: Package,
+        permission: "PRODUCTS_VIEW",
+      },
+
       {
         title: "Serial Management",
         href: "/serials",
@@ -68,7 +76,7 @@ export const SIDEBAR_MENU = [
       },
 
       {
-        title: "Shipments",
+        title: "Stock Out",
         href: "/shipments",
         icon: Truck,
         permission: "SHIPMENTS_VIEW",
@@ -86,6 +94,27 @@ export const SIDEBAR_MENU = [
         href: "/management/warranty",
         icon: ShieldCheck,
         permission: "WARRANTY_VIEW",
+      },
+
+      {
+        title: "Warranty Replacement History",
+        href: "/warranty-replacements",
+        icon: ClipboardCheck,
+        permission: "WARRANTY_VIEW",
+      },
+
+      {
+        title: "Warranty Policies",
+        href: "/warranty-policies",
+        icon: ClipboardCheck,
+        permission: "WARRANTY_POLICY_VIEW",
+      },
+
+      {
+        title: "Stock Count",
+        href: "/suntree-warehouse/stock-count",
+        icon: ClipboardList,
+        permission: "STOCK_COUNT_VIEW",
       },
     ],
   },

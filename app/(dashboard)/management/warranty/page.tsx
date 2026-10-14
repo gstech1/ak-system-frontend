@@ -19,9 +19,10 @@ type WarrantyResult = {
   remarks?: string | null;
 };
 
-const API_BASE_URL =
+const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001";
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 function getAccessToken() {
   if (typeof window === "undefined") {

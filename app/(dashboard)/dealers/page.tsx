@@ -4,9 +4,10 @@ import { FormEvent, useEffect, useState } from 'react';
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:5001';
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:5001'
+).replace(/\/+$/, "");
 
 type Dealer = {
   id: string;
@@ -457,76 +458,163 @@ export default function DealersPage() {
   }
 
   async function toggleStatus(
-    dealer: Dealer,
-  ) {
-    const nextStatus =
-      dealer.status === 'ACTIVE'
-        ? 'INACTIVE'
-        : 'ACTIVE';
+  dealer: Dealer,
+) {
+  const nextStatus =
+    dealer.status === 'ACTIVE'
+      ? 'INACTIVE'
+      : 'ACTIVE';
 
-    const confirmed = window.confirm(
-      `${nextStatus === 'ACTIVE' ? 'Activate' : 'Deactivate'} ${dealer.companyName}?`,
-    );
+  const confirmed = window.confirm(
+    `${nextStatus === 'ACTIVE' ? 'Activate' : 'Deactivate'} ${dealer.companyName}?`,
+  );
 
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setError('');
-      setSuccess('');
-
-      const token =
-        localStorage.getItem('accessToken');
-
-      if (!token) {
-        throw new Error(
-          'Login session not found.',
-        );
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/dealers/${dealer.id}/status`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            status: nextStatus,
-          }),
-        },
-      );
-
-      const data =
-        await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            'Unable to update dealer status.',
-        );
-      }
-
-      setSuccess(
-        `Dealer ${nextStatus === 'ACTIVE' ? 'activated' : 'deactivated'} successfully.`,
-      );
-
-      await loadDealers();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to update dealer status.',
-      );
-    } finally {
-      setActionLoading(false);
-    }
+  if (!confirmed) {
+    return;
   }
 
-  return (
+  try {
+    setActionLoading(true);
+    setError('');
+    setSuccess('');
+
+    const token =
+      localStorage.getItem('accessToken');
+
+    if (!token) {
+      throw new Error(
+        'Login session not found.',
+      );
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/dealers/${dealer.id}/status`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      },
+    );
+
+    const data =
+      await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          'Unable to update dealer status.',
+      );
+    }
+
+    setSuccess(
+      `Dealer ${nextStatus === 'ACTIVE' ? 'activated' : 'deactivated'} successfully.`,
+    );
+
+    await loadDealers();
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to update dealer status.',
+    );
+  } finally {
+    setActionLoading(false);
+  }
+}
+
+// =========================================================
+// DELETE DEALER
+// SUPER ADMIN ONLY
+// =========================================================
+
+async function handleDeleteDealer(
+  dealer: Dealer,
+) {
+  const authRaw =
+    localStorage.getItem('accessToken');
+
+  const userRaw =
+    localStorage.getItem('authUser');
+
+  if (!authRaw) {
+    setError('Login session not found.');
+    return;
+  }
+
+  let currentUser: {
+    role?: string;
+  } = {};
+
+  try {
+    currentUser = userRaw
+      ? JSON.parse(userRaw)
+      : {};
+  } catch {
+    currentUser = {};
+  }
+
+  if (currentUser.role !== 'ADMIN') {
+    setError(
+      'Only Super Admin can delete Dealer accounts.',
+    );
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Delete ${dealer.companyName} (${dealer.dealerCode}) permanently?\n\nThis action cannot be undone.`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setActionLoading(true);
+    setError('');
+    setSuccess('');
+
+    const response = await fetch(
+      `${API_BASE_URL}/dealers/${dealer.id}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${authRaw}`,
+        },
+      },
+    );
+
+    const data =
+      await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          'Unable to delete dealer.',
+      );
+    }
+
+    setSuccess(
+      `Dealer ${dealer.dealerCode} deleted successfully.`,
+    );
+
+    await loadDealers();
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to delete dealer.',
+    );
+  } finally {
+    setActionLoading(false);
+  }
+}
+
+return (
   <DashboardShell>
     <div className="mx-auto max-w-7xl space-y-6">
 
@@ -536,19 +624,19 @@ export default function DealersPage() {
           subtitle="Manage Dealer information, login accounts, passwords and account status."
         />
 
-          <button
-            type="button"
-            onClick={() => {
-              setForm(initialForm);
-              setError('');
-              setSuccess('');
-              setShowCreate(true);
-            }}
-            className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            + Create Dealer
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setForm(initialForm);
+            setError('');
+            setSuccess('');
+            setShowCreate(true);
+          }}
+          className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+        >
+          + Create Dealer
+        </button>
+      </div>
 
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -563,209 +651,224 @@ export default function DealersPage() {
         )}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Dealer Accounts
-            </h2>
+  <div className="border-b border-slate-200 px-6 py-4">
+    <h2 className="text-xl font-semibold text-slate-900">
+      Dealer Accounts
+    </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {dealers.length} dealer account
-              {dealers.length === 1 ? '' : 's'}
-            </p>
-          </div>
+    <p className="mt-1 text-sm text-slate-500">
+      {dealers.length} dealer account
+      {dealers.length === 1 ? '' : 's'}
+    </p>
+  </div>
 
-          {loading ? (
-            <div className="p-6 text-sm text-slate-500">
-              Loading dealers...
-            </div>
-          ) : dealers.length === 0 ? (
-            <div className="p-6 text-sm text-slate-500">
-              No dealer accounts found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">
-                      Dealer Code
-                    </th>
+  {loading ? (
+    <div className="p-6 text-sm text-slate-500">
+      Loading dealers...
+    </div>
+  ) : dealers.length === 0 ? (
+    <div className="p-6 text-sm text-slate-500">
+      No dealer accounts found.
+    </div>
+  ) : (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="px-5 py-3 font-semibold">
+              Dealer Code
+            </th>
 
-                    <th className="px-5 py-3 font-semibold">
-                      Company
-                    </th>
+            <th className="px-5 py-3 font-semibold">
+              Company
+            </th>
 
-                    <th className="px-5 py-3 font-semibold">
-                      Contact
-                    </th>
+            <th className="px-5 py-3 font-semibold">
+              Contact
+            </th>
 
-                    <th className="px-5 py-3 font-semibold">
-                      Phone
-                    </th>
+            <th className="px-5 py-3 font-semibold">
+              Phone
+            </th>
 
-                    <th className="px-5 py-3 font-semibold">
-                      Township
-                    </th>
+            <th className="px-5 py-3 font-semibold">
+              Township
+            </th>
 
-                    <th className="px-5 py-3 font-semibold">
-                      Status
-                    </th>
+            <th className="px-5 py-3 font-semibold">
+              Status
+            </th>
 
-                    <th className="px-5 py-3 text-right font-semibold">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+            <th className="px-5 py-3 text-right font-semibold">
+              Actions
+            </th>
+          </tr>
+        </thead>
 
-                <tbody className="divide-y divide-slate-100">
-                  {dealers.map((dealer) => (
-                    <tr
-                      key={dealer.id}
-                      className="hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-4 font-bold text-slate-900">
-                        {dealer.dealerCode}
-                      </td>
+        <tbody className="divide-y divide-slate-100">
+          {dealers.map((dealer) => (
+            <tr
+              key={dealer.id}
+              className="hover:bg-slate-50"
+            >
+              <td className="px-5 py-4 font-bold text-slate-900">
+                {dealer.dealerCode}
+              </td>
 
-                      <td className="px-5 py-4">
-                        <div>
-                          <p className="font-semibold text-slate-800">
-                            {dealer.companyName}
-                          </p>
+              <td className="px-5 py-4">
+                <div>
+                  <p className="font-semibold text-slate-800">
+                    {dealer.companyName}
+                  </p>
 
-                          <p className="text-xs text-slate-500">
-                            {dealer.ownerName}
-                          </p>
-                        </div>
-                      </td>
+                  <p className="text-xs text-slate-500">
+                    {dealer.ownerName}
+                  </p>
+                </div>
+              </td>
 
-                      <td className="px-5 py-4 text-slate-700">
-                        {dealer.contactPerson || '—'}
-                      </td>
+              <td className="px-5 py-4 text-slate-700">
+                {dealer.contactPerson || '—'}
+              </td>
 
-                      <td className="px-5 py-4 text-slate-700">
-                        {dealer.phone}
-                      </td>
+              <td className="px-5 py-4 text-slate-700">
+                {dealer.phone}
+              </td>
 
-                      <td className="px-5 py-4 text-slate-700">
-                        {dealer.township}
-                      </td>
+              <td className="px-5 py-4 text-slate-700">
+                {dealer.township}
+              </td>
 
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                            dealer.status === 'ACTIVE'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {dealer.status}
-                        </span>
-                      </td>
+              <td className="px-5 py-4">
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                    dealer.status === 'ACTIVE'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {dealer.status}
+                </span>
+              </td>
 
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openDetails(dealer)
-                            }
-                            disabled={actionLoading}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                          >
-                            View
-                          </button>
+              <td className="px-5 py-4">
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openDetails(dealer)
+                    }
+                    disabled={actionLoading}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    View
+                  </button>
 
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const token =
-                                  localStorage.getItem(
-                                    'accessToken',
-                                  );
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const token =
+                          localStorage.getItem(
+                            'accessToken',
+                          );
 
-                                if (!token) {
-                                  throw new Error(
-                                    'Login session not found.',
-                                  );
-                                }
+                        if (!token) {
+                          throw new Error(
+                            'Login session not found.',
+                          );
+                        }
 
-                                const response =
-                                  await fetch(
-                                    `${API_BASE_URL}/dealers/${dealer.id}`,
-                                    {
-                                      headers: {
-                                        Authorization:
-                                          `Bearer ${token}`,
-                                      },
-                                    },
-                                  );
+                        const response =
+                          await fetch(
+                            `${API_BASE_URL}/dealers/${dealer.id}`,
+                            {
+                              headers: {
+                                Authorization:
+                                  `Bearer ${token}`,
+                              },
+                            },
+                          );
 
-                                const data =
-                                  await response.json();
+                        const data =
+                          await response.json();
 
-                                if (!response.ok) {
-                                  throw new Error(
-                                    data?.message ||
-                                      'Unable to load dealer.',
-                                  );
-                                }
+                        if (!response.ok) {
+                          throw new Error(
+                            data?.message ||
+                              'Unable to load dealer.',
+                          );
+                        }
 
-                                openEdit(data);
-                              } catch (err) {
-                                setError(
-                                  err instanceof Error
-                                    ? err.message
-                                    : 'Unable to load dealer.',
-                                );
-                              }
-                            }}
-                            disabled={actionLoading}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                          >
-                            Edit
-                          </button>
+                        openEdit(data);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : 'Unable to load dealer.',
+                        );
+                      }
+                    }}
+                    disabled={actionLoading}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openPasswordModal(dealer)
-                            }
-                            disabled={actionLoading}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                          >
-                            Password
-                          </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openPasswordModal(dealer)
+                    }
+                    disabled={actionLoading}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Password
+                  </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleStatus(dealer)
-                            }
-                            disabled={actionLoading}
-                            className={`rounded-lg px-3 py-2 text-xs font-bold transition disabled:opacity-50 ${
-                              dealer.status === 'ACTIVE'
-                                ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            }`}
-                          >
-                            {dealer.status === 'ACTIVE'
-                              ? 'Deactivate'
-                              : 'Activate'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleStatus(dealer)
+                    }
+                    disabled={actionLoading}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition disabled:opacity-50 ${
+                      dealer.status === 'ACTIVE'
+                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {dealer.status === 'ACTIVE'
+                      ? 'Deactivate'
+                      : 'Activate'}
+                  </button>
 
-      {/* =====================================================
+                  {localStorage.getItem('authUser') &&
+                  JSON.parse(
+                  localStorage.getItem('authUser') ||
+                   '{}',
+                    )?.role === 'ADMIN' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDeleteDealer(dealer)
+                        }
+                        disabled={actionLoading}
+                        className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
+     {/* =====================================================
           CREATE DEALER MODAL
       ===================================================== */}
 
@@ -1296,8 +1399,10 @@ export default function DealersPage() {
             </div>
           </form>
         </Modal>
-      )}
-    </DashboardShell>
+            )}
+
+    </div>
+  </DashboardShell>
   );
 }
 

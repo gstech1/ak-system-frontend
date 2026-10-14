@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PermissionGuard from "@/components/auth/PermissionGuard";
+import DashboardShell from "@/components/layout/DashboardShell";
 
 type WarrantyPolicy = {
   id: string;
@@ -15,7 +16,6 @@ type WarrantyPolicy = {
     | "CUSTOMER_SALE";
   registrationRequired: boolean;
   registrationDeadlineMonths?: number | null;
-  claimLimit?: number | null;
   replacementLimit?: number | null;
   isActive: boolean;
 };
@@ -30,13 +30,13 @@ type FormData = {
     | "CUSTOMER_SALE";
   registrationRequired: boolean;
   registrationDeadlineMonths: string;
-  claimLimit: string;
   replacementLimit: string;
 };
 
-const API_BASE_URL =
+const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000/api";
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 const emptyForm: FormData = {
   code: "",
@@ -45,7 +45,6 @@ const emptyForm: FormData = {
   startRule: "DEALER_PURCHASE",
   registrationRequired: false,
   registrationDeadlineMonths: "",
-  claimLimit: "",
   replacementLimit: "",
 };
 
@@ -54,12 +53,14 @@ export default function WarrantyPoliciesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [editingPolicy, setEditingPolicy] =
     useState<WarrantyPolicy | null>(null);
 
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [applyToExistingProducts, setApplyToExistingProducts] = useState(false);
 
   async function loadPolicies() {
     try {
@@ -116,15 +117,43 @@ export default function WarrantyPoliciesPage() {
       : `${value} time${value === 1 ? "" : "s"}`;
   }
 
+  function formatPolicySummary(policy: WarrantyPolicy) {
+    let warrantyStart: string;
+
+    if (policy.startRule === "DEALER_PURCHASE") {
+      warrantyStart = `Dealer ဝယ်ယူသည့်နေ့မှ ${policy.warrantyMonths} လ အာမခံ`;
+    } else if (policy.startRule === "DEALER_REGISTRATION") {
+      const registrationWindow =
+        policy.registrationRequired &&
+        policy.registrationDeadlineMonths != null
+          ? `Dealer ဝယ်ယူပြီး ${policy.registrationDeadlineMonths} လအတွင်း Register လုပ်ရန်၊ `
+          : "";
+      warrantyStart = `${registrationWindow}Register လုပ်သည့်နေ့မှ ${policy.warrantyMonths} လ အာမခံ`;
+    } else {
+      warrantyStart = `Dealer က Customer ကို ရောင်းသည့်နေ့မှ ${policy.warrantyMonths} လ အာမခံ`;
+    }
+
+    const replacement =
+      policy.replacementLimit == null
+        ? "အစားထိုးခွင့် အကန့်အသတ်မရှိ"
+        : `အစားထိုးခွင့် ${policy.replacementLimit} ကြိမ်`;
+
+    return `${warrantyStart} · ${replacement}`;
+  }
+
   function openCreateForm() {
     setEditingPolicy(null);
     setForm(emptyForm);
+    setApplyToExistingProducts(false);
     setShowForm(true);
     setError("");
+    setSuccessMessage("");
   }
 
   function openEditForm(policy: WarrantyPolicy) {
     setEditingPolicy(policy);
+    setApplyToExistingProducts(false);
+    setSuccessMessage("");
 
     setForm({
       code: policy.code,
@@ -140,10 +169,6 @@ export default function WarrantyPoliciesPage() {
           ? String(
               policy.registrationDeadlineMonths,
             )
-          : "",
-      claimLimit:
-        policy.claimLimit != null
-          ? String(policy.claimLimit)
           : "",
       replacementLimit:
         policy.replacementLimit != null
@@ -161,6 +186,7 @@ export default function WarrantyPoliciesPage() {
     setShowForm(false);
     setEditingPolicy(null);
     setForm(emptyForm);
+    setApplyToExistingProducts(false);
   }
 
   function updateForm(
@@ -219,13 +245,11 @@ export default function WarrantyPoliciesPage() {
                 form.registrationDeadlineMonths,
               )
             : null,
-        claimLimit: form.claimLimit
-          ? Number(form.claimLimit)
-          : null,
         replacementLimit:
           form.replacementLimit
             ? Number(form.replacementLimit)
             : null,
+        ...(editingPolicy ? { applyToExistingProducts } : {}),
       };
 
       const url = editingPolicy
@@ -255,6 +279,15 @@ export default function WarrantyPoliciesPage() {
                 : "create"
             } warranty policy.`,
         );
+      }
+
+      const savedPolicy = await response.json().catch(() => null);
+      if (editingPolicy) {
+        setSuccessMessage(applyToExistingProducts
+          ? `Policy updated. ${savedPolicy?.updatedProducts ?? 0} existing product(s) now use the new rules. Previously registered warranty dates remain unchanged.`
+          : "Policy updated for future products. Existing products keep their current rules.");
+      } else {
+        setSuccessMessage("Warranty policy created.");
       }
 
       closeForm();
@@ -313,9 +346,10 @@ export default function WarrantyPoliciesPage() {
     }
   }
 
-    return (
-    <PermissionGuard permission="WARRANTY_POLICY_VIEW">
-    <main className="min-h-screen bg-slate-100 p-6">
+  return (
+    <DashboardShell>
+      <PermissionGuard permission="WARRANTY_POLICY_VIEW">
+    <div className="mx-auto w-full max-w-7xl">
       <div className="mx-auto max-w-7xl">
 
         {/* Header */}
@@ -354,6 +388,12 @@ export default function WarrantyPoliciesPage() {
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+            {successMessage}
           </div>
         )}
 
@@ -537,32 +577,6 @@ export default function WarrantyPoliciesPage() {
 
               </div>
 
-              {/* Claim Limit */}
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Claim Limit
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={form.claimLimit}
-                  onChange={(e) =>
-                    updateForm(
-                      "claimLimit",
-                      e.target.value,
-                    )
-                  }
-                  placeholder="Leave empty = Unlimited"
-                  className="h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                />
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Empty means unlimited.
-                </p>
-              </div>
-
               {/* Replacement Limit */}
 
               <div>
@@ -588,6 +602,23 @@ export default function WarrantyPoliciesPage() {
                   Empty means unlimited.
                 </p>
               </div>
+
+              {editingPolicy && <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 md:col-span-2">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={applyToExistingProducts}
+                    onChange={(event) => setApplyToExistingProducts(event.target.checked)}
+                    className="mt-1 h-5 w-5 accent-sky-600"
+                  />
+                  <span>
+                    <span className="block font-semibold text-slate-800">လက်ရှိဒီ policy သုံးနေတဲ့ Product တွေကိုပါ ပြောင်းမယ်</span>
+                    <span className="mt-1 block text-sm leading-5 text-slate-600">
+                      မရွေးထားရင် နောင်ဖန်တီးမယ့် Product တွေမှာသာ စည်းကမ်းအသစ်သက်ရောက်မယ်။ ရွေးထားရင် ဒီ policy ချိတ်ထားတဲ့ Product ရှိပြီးသားတွေမှာပါ သက်ရောက်မယ်။ မှတ်ပုံတင်ပြီးသား warranty ရဲ့ စတင်/ကုန်ဆုံးရက်ကိုတော့ ပြန်မပြောင်းပါ။
+                    </span>
+                  </span>
+                </label>
+              </div>}
 
             </div>
 
@@ -683,6 +714,9 @@ export default function WarrantyPoliciesPage() {
                         >
                      {policy.name}
                     </h2>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                      {formatPolicySummary(policy)}
+                    </p>
                   </div>
 
                   <button
@@ -741,18 +775,6 @@ export default function WarrantyPoliciesPage() {
 
                   <div className="rounded-xl bg-slate-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Claim Limit
-                    </p>
-
-                    <p className="mt-1 font-bold text-slate-900">
-                      {formatLimit(
-                        policy.claimLimit,
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-4 sm:col-span-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Replacement Limit
                     </p>
 
@@ -798,7 +820,8 @@ export default function WarrantyPoliciesPage() {
         )}
 
       </div>
-        </main>
-    </PermissionGuard>
+    </div>
+      </PermissionGuard>
+    </DashboardShell>
   );
 }

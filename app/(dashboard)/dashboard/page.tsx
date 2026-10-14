@@ -18,9 +18,21 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [canViewRecentActivity, setCanViewRecentActivity] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    try {
+      const authUser = JSON.parse(
+        localStorage.getItem("authUser") ?? "null",
+      );
+      setCanViewRecentActivity(
+        authUser?.role === "ADMIN" || authUser?.role === "MANAGER",
+      );
+    } catch {
+      setCanViewRecentActivity(false);
+    }
 
     async function loadDashboard() {
       try {
@@ -248,7 +260,7 @@ export default function DashboardPage() {
             <QuickActionCard
               title="Website Management"
               description="Manage website content and media."
-              href="/website-management"
+              href="/dashboard/website"
             />
           </div>
         </section>
@@ -305,8 +317,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Recent Activity */}
-      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      {canViewRecentActivity && <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-900">
             Recent Activity
@@ -364,7 +375,7 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </DashboardShell>
   );
 }

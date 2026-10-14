@@ -9,8 +9,10 @@ import {
   WebsiteProject,
 } from "@/lib/api";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 function getImageUrl(image?: string | null) {
   if (!image) return null;

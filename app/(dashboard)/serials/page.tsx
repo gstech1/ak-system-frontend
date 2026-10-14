@@ -11,6 +11,7 @@ import {
 import {
   approveSerialReject,
   createSerialBulk,
+  deleteSerial,
   getProducts,
   getSerials,
   rejectSerial,
@@ -46,12 +47,74 @@ function normalizeSerialInput(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function addMonths(value: string | null | undefined, months: number) {
+  if (!value || !Number.isFinite(months)) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()));
+  return date.toISOString();
+}
+
+function formatWarrantyDate(value: string | null | undefined) {
+  return value
+    ? new Date(value).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+}
+
+function earlierDate(first: string | null, second: string | null) {
+  if (!first) return second;
+  if (!second) return first;
+  return new Date(first).getTime() <= new Date(second).getTime() ? first : second;
+}
+
+function getSerialWarrantyDates(serial: Serial, product?: Product | null) {
+  const code = (product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "").toUpperCase();
+  const months = product?.warrantyPolicyMonths ?? product?.warrantyPolicy?.warrantyMonths ?? product?.warrantyMonths ?? 12;
+  const purchaseDate = serial.shippedAt ?? serial.shipmentItem?.shipment?.shipmentDate ?? null;
+
+  if (code === "A") {
+    return { start: purchaseDate, end: addMonths(purchaseDate, months) };
+  }
+  if (code === "B" || code === "C") {
+    const deadlineMonths = product?.warrantyRegistrationDeadlineMonths ?? product?.warrantyPolicy?.registrationDeadlineMonths ?? 12;
+    return {
+      start: purchaseDate,
+      end: serial.warranty?.registerDate
+        ? earlierDate(
+            addMonths(serial.warranty.registerDate, months),
+            addMonths(purchaseDate, months + deadlineMonths),
+          )
+        : addMonths(purchaseDate, months),
+    };
+  }
+  if (code === "D" || code === "E") {
+    return { start: serial.warranty?.warrantyStart ?? null, end: serial.warranty?.warrantyEnd ?? null };
+  }
+
+  const dealerPurchaseStart = product?.warrantyStartRule === "DEALER_PURCHASE";
+  return {
+    start: serial.warranty?.warrantyStart ?? (dealerPurchaseStart ? purchaseDate : null),
+    end: serial.warranty?.warrantyEnd ?? (dealerPurchaseStart ? addMonths(purchaseDate, months) : null),
+  };
+}
+
 export default function SerialsPage() {
   const [serials, setSerials] = useState<Serial[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
     const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingSerialId, setDeletingSerialId] =
+    useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   /* ======================================================
@@ -85,10 +148,6 @@ export default function SerialsPage() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-
-  const selectedProduct = products.find(
-    (product) => product.id === productId,
-  );
 
   /* ======================================================
      SCANNER
@@ -148,7 +207,7 @@ export default function SerialsPage() {
           page,
           50,
           search,
-          productId,
+          "",
           status,
         ),
         getProducts(),
@@ -175,9 +234,21 @@ export default function SerialsPage() {
   }, [
     page,
     search,
-    productId,
     status,
   ]);
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("authUser");
+      const authUser = storedUser
+        ? JSON.parse(storedUser)
+        : null;
+
+      setIsAdmin(authUser?.role === "ADMIN");
+    } catch {
+      setIsAdmin(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -587,12 +658,49 @@ export default function SerialsPage() {
     }
   }
 
-  function formatProductCompact(product: Product) {
-  const type =
-    product.category ||
-    product.name ||
-    product.productCode;
+  async function handleDeleteSerial(serial: Serial) {
+    if (!isAdmin) {
+      return;
+    }
 
+    const formattedSerial = formatSerial(
+      serial.serialNumber,
+    );
+
+    if (
+      !window.confirm(
+        `Delete serial ${formattedSerial}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingSerialId(serial.id);
+      setError("");
+      setSuccess("");
+
+      await deleteSerial(serial.serialNumber);
+
+      setSuccess(
+        `Serial ${formattedSerial} deleted successfully.`,
+      );
+
+      await loadData();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete serial.",
+      );
+    } finally {
+      setDeletingSerialId(null);
+    }
+  }
+
+  function formatProductCompact(product: Product) {
   const specs = [
     product.ratedCurrent,
     product.ratedVoltage,
@@ -601,7 +709,13 @@ export default function SerialsPage() {
       : null,
   ].filter(Boolean);
 
-  return `${type} · ${specs.join(" · ")}`;
+  const identity = [
+    product.productCode,
+    product.name,
+    product.modelCode,
+  ].filter(Boolean);
+
+  return [...identity, ...specs].join(" · ");
 }
 
   return (
@@ -797,7 +911,29 @@ export default function SerialsPage() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-         
+            {/* Product */}
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Product
+              </label>
+              <select
+                value={productId}
+                onChange={(event) => {
+                  setProductId(event.target.value);
+                  setError("");
+                }}
+                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                required
+              >
+                <option value="">Select a product</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.productCode} — {product.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
                {/* Serial Range */}
               <div className="grid gap-5 md:grid-cols-2">
                 {/* Start Serial */}
@@ -907,39 +1043,6 @@ export default function SerialsPage() {
                     : "Register Serials"}
                 </button>
               </div>
-  
-            {/* Received Date */}
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-              <div className="text-sm font-semibold text-slate-700">
-                Received Date
-              </div>
-
-              <div className="mt-1 text-sm text-emerald-700">
-                Automatically set to today when registered.
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={closeForm}
-                disabled={saving}
-                className="h-12 rounded-xl border border-slate-300 px-5 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                Close
-              </button>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-12 rounded-xl bg-emerald-600 px-6 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving
-                  ? "Registering..."
-                  : "Register Serials"}
-              </button>
-            </div>
           </form>
         </div>
       )}
@@ -962,7 +1065,7 @@ export default function SerialsPage() {
     </div>
   ) : (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1000px] text-left">
+      <table className="w-full min-w-[1300px] text-left">
         <thead className="bg-slate-50">
           <tr>
             <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
@@ -982,6 +1085,18 @@ export default function SerialsPage() {
             </th>
 
             <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
+              Type
+            </th>
+
+            <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
+              W-start
+            </th>
+
+            <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
+              W-end
+            </th>
+
+            <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
               Status
             </th>
 
@@ -996,6 +1111,7 @@ export default function SerialsPage() {
             const product =
               serial.product ||
               serial.shipmentItem?.product;
+            const warrantyDates = getSerialWarrantyDates(serial, product);
 
             return (
   <tr
@@ -1044,6 +1160,21 @@ export default function SerialsPage() {
         : "-"}
     </td>
 
+    {/* Warranty policy type */}
+    <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+      {product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "—"}
+    </td>
+
+    {/* Warranty start */}
+    <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+      {formatWarrantyDate(warrantyDates.start)}
+    </td>
+
+    {/* Warranty end */}
+    <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+      {formatWarrantyDate(warrantyDates.end)}
+    </td>
+
     {/* Status */}
     <td className="px-5 py-4">
       <span
@@ -1063,6 +1194,19 @@ export default function SerialsPage() {
     {/* Actions */}
     <td className="px-5 py-4">
       <div className="flex items-center gap-2">
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => handleDeleteSerial(serial)}
+            disabled={deletingSerialId === serial.id}
+            className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {deletingSerialId === serial.id
+              ? "Deleting..."
+              : "Delete"}
+          </button>
+        )}
+
         {(serial.status === "IN_STOCK" ||
           serial.status === "REGISTERED") && (
           <button

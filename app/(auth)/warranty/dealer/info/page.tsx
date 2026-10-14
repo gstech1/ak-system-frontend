@@ -34,9 +34,10 @@ type DealerInfo = {
   remarks?: string;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5001";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 export default function DealerInfoPage() {
   const router = useRouter();

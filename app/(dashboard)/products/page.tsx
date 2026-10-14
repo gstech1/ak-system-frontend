@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 
 import PermissionGuard from "@/components/auth/PermissionGuard";
+import DashboardShell from "@/components/layout/DashboardShell";
 
 type FormState = {
   productCode: string;
@@ -643,8 +644,9 @@ async function handleToggleProductStatus(
   }
 
    return (
-    <PermissionGuard permission="PRODUCTS_VIEW">
-      <main className="min-h-screen bg-slate-100 p-6 md:p-8">
+    <DashboardShell>
+      <PermissionGuard permission="PRODUCTS_VIEW">
+      <div className="w-full">
 
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1163,9 +1165,9 @@ async function handleToggleProductStatus(
                 key={product.id}
                 className="p-6 transition hover:bg-slate-50"
               >
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="grid gap-4 xl:grid-cols-[minmax(240px,1.5fr)_minmax(110px,0.7fr)_minmax(180px,1.15fr)_minmax(130px,0.8fr)_auto] xl:items-stretch">
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 self-center">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                         {product.productCode}
@@ -1198,44 +1200,8 @@ async function handleToggleProductStatus(
                     </p>
                   </div>
 
-                  <div className="grid gap-5 lg:grid-cols-[minmax(320px,1fr)_220px_320px_220px_170px] lg:items-center lg:gap-4">
-
-  {/* Product Info */}
-  <div className="min-w-0">
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-        {product.productCode}
-      </span>
-
-      <button
-        type="button"
-        onClick={() =>
-          handleToggleProductStatus(product)
-        }
-        className={`rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80 ${
-          product.isActive
-            ? "bg-emerald-100 text-emerald-700"
-            : "bg-slate-200 text-slate-600"
-        }`}
-      >
-        {product.isActive
-          ? "ACTIVE"
-          : "INACTIVE"}
-      </button>
-    </div>
-
-    <h3 className="mt-3 text-lg font-bold text-slate-900">
-      {product.name}
-    </h3>
-
-    <p className="mt-1 text-sm text-slate-500">
-      {product.modelCode} ·{" "}
-      {product.category}
-    </p>
-  </div>
-
   {/* Warranty */}
-  <div className="rounded-xl bg-slate-50 p-4 lg:h-full">
+  <div className="rounded-xl bg-slate-50 p-4 xl:h-full">
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
       Warranty
     </p>
@@ -1246,7 +1212,7 @@ async function handleToggleProductStatus(
   </div>
 
   {/* Policy */}
-  <div className="rounded-xl bg-slate-50 p-4 lg:h-full">
+  <div className="rounded-xl bg-slate-50 p-4 xl:h-full">
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
       Policy
     </p>
@@ -1259,7 +1225,7 @@ async function handleToggleProductStatus(
   </div>
 
   {/* Rating */}
-  <div className="rounded-xl bg-slate-50 p-4 lg:h-full">
+  <div className="rounded-xl bg-slate-50 p-4 xl:h-full">
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
       Rating
     </p>
@@ -1271,7 +1237,7 @@ async function handleToggleProductStatus(
   </div>
 
   {/* Actions */}
-  <div className="flex shrink-0 gap-2 lg:justify-end">
+  <div className="flex shrink-0 items-center gap-2 xl:justify-end">
     <button
       type="button"
       onClick={() =>
@@ -1293,16 +1259,14 @@ async function handleToggleProductStatus(
     </button>
   </div>
 
-</div>
-
-                 
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
-          </main>
-    </PermissionGuard>
+      </div>
+      </PermissionGuard>
+    </DashboardShell>
   );
 }

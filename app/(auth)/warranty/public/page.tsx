@@ -373,6 +373,7 @@ export default function PublicWarrantyPage() {
             >
               <WarrantyResultCard
                 status={result.status}
+                publicDisplay
                 {...result}
               />
             </div>

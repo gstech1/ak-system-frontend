@@ -1,6 +1,7 @@
-const API_BASE_URL =
+const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001";
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 /* ======================================================
    AUTH
@@ -61,6 +62,7 @@ export interface WarrantyResponse {
   warrantyNo?: string;
   product?: string;
   productCode?: string;
+  policyCode?: string | null;
   serialNumber?: string;
   warrantyStart?: string | null;
   warrantyEnd?: string | null;
@@ -179,6 +181,12 @@ export interface Product {
   warrantyMonths: number;
 
   warrantyPolicyId?: string | null;
+  warrantyPolicyCode?: string | null;
+  warrantyPolicyName?: string | null;
+  warrantyPolicyMonths?: number | null;
+  warrantyStartRule?: WarrantyStartRule | null;
+  warrantyRegistrationRequired?: boolean | null;
+  warrantyRegistrationDeadlineMonths?: number | null;
 
   warrantyPolicy?: WarrantyPolicy | null;
 
@@ -478,6 +486,7 @@ export interface Serial {
   shipmentItem?: {
     product?: Product | null;
     shipment?: {
+      shipmentDate?: string;
       dealer?: {
         id: string;
         dealerCode: string;
@@ -551,6 +560,26 @@ export async function getSerials(
   }
 
   return await response.json();
+}
+
+export async function getSerialByNumber(
+  serialNumber: string,
+): Promise<Serial> {
+  const response = await fetch(
+    `${API_BASE_URL}/serials/scan/${encodeURIComponent(serialNumber)}`,
+    {
+      method: "GET",
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Serial number was not found.");
+  }
+
+  return response.json();
 }
 
 export async function createSerial(
@@ -691,6 +720,34 @@ export async function approveSerialReject(
 }
 
 /* ======================================================
+   DELETE SERIAL (SUPER ADMIN ONLY)
+   ====================================================== */
+
+export async function deleteSerial(
+  serialNumber: string,
+): Promise<{ message: string; serialNumber: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/serials/${encodeURIComponent(
+      serialNumber,
+    )}`,
+    {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+
+    throw new Error(
+      error?.message || "Unable to delete serial.",
+    );
+  }
+
+  return response.json();
+}
+
+/* ======================================================
    DASHBOARD
    ====================================================== */
 
@@ -777,6 +834,12 @@ export interface Shipment {
   remarks: string | null;
   createdAt: string;
   updatedAt: string;
+  dealer?: {
+    id: string;
+    dealerCode: string;
+    companyName: string;
+  };
+  items?: ShipmentItem[];
 }
 
 export interface ShipmentItem {
@@ -787,6 +850,129 @@ export interface ShipmentItem {
   createdAt: string;
   updatedAt: string;
   product?: Product;
+  serials?: ShipmentSerial[];
+}
+
+export interface ShipmentSerial {
+  id: string;
+  serialNumber: string;
+  status: string;
+  shippedAt?: string | null;
+  warranty?: {
+    warrantyNo: string;
+    registerDate: string;
+    warrantyStart: string;
+    warrantyEnd: string;
+    status: string;
+    returns: {
+      returnNo: string;
+      status: string;
+      reason: string;
+      createdAt: string;
+      items: {
+        replacementSerial?: {
+          serialNumber: string;
+          status: string;
+        } | null;
+      }[];
+    }[];
+  } | null;
+  oldReplacementItems: {
+    return: {
+      returnNo: string;
+      status: string;
+      reason: string;
+      createdAt: string;
+    };
+    replacementSerial?: {
+      serialNumber: string;
+      status: string;
+    } | null;
+  }[];
+  newReplacementItems: {
+    return: {
+      returnNo: string;
+      status: string;
+      reason: string;
+      createdAt: string;
+    };
+    oldSerial: {
+      serialNumber: string;
+      status: string;
+    };
+  }[];
+}
+
+export interface SuntreeServiceIssue {
+  id: string;
+  issueNo: string;
+  dealerName: string;
+  serviceDepartment: string;
+  projectName: string;
+  servicePerson: string;
+  issuedDate: string;
+  remarks?: string | null;
+  status: "OPEN" | "COMPLETED";
+  items: {
+    id: string;
+    serialId: string;
+    disposition: "ISSUED" | "RETURNED" | "SOLD";
+    serial: {
+      id: string;
+      serialNumber: string;
+      status: string;
+      product?: { id: string; name: string; productCode: string } | null;
+    };
+  }[];
+}
+
+export async function getSuntreeServiceIssues(): Promise<SuntreeServiceIssue[]> {
+  const response = await fetch(`${API_BASE_URL}/service-issues`, {
+    headers: { ...getAuthHeaders() },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to load service issue records.");
+  }
+  return response.json();
+}
+
+export async function createSuntreeServiceIssue(data: {
+  issueNo: string;
+  serviceDepartment: string;
+  projectName: string;
+  servicePerson: string;
+  issuedDate: string;
+  remarks?: string;
+  serialNumbers: string[];
+}): Promise<SuntreeServiceIssue> {
+  const response = await fetch(`${API_BASE_URL}/service-issues`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to create service issue.");
+  }
+  return response.json();
+}
+
+export async function completeSuntreeServiceIssue(
+  id: string,
+  returnedSerialNumbers: string[],
+): Promise<SuntreeServiceIssue> {
+  const response = await fetch(`${API_BASE_URL}/service-issues/${id}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ returnedSerialNumbers }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to complete service return.");
+  }
+  return response.json();
 }
 
 export interface CreateShipmentInput {
@@ -915,6 +1101,31 @@ export async function createShipment(
   return await response.json();
 }
 
+export async function createShipmentWithSerials(
+  data: CreateShipmentInput & { serialNumbers: string[] },
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/complete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      errorData?.message || "Unable to create and complete shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
 export async function updateShipment(
   id: string,
   data: UpdateShipmentInput,
@@ -990,6 +1201,36 @@ export async function addShipmentItem(
     throw new Error(
       errorData?.message ||
         "Unable to add shipment item.",
+    );
+  }
+
+  return await response.json();
+}
+
+export async function assignShipmentSerials(
+  shipmentId: string,
+  serialNumbers: string[],
+): Promise<{
+  shipment: Shipment;
+  assignedSerials: string[];
+  count: number;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${shipmentId}/assign-serials`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ serialNumbers }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      errorData?.message || "Unable to assign serials to shipment.",
     );
   }
 

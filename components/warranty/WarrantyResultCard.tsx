@@ -22,6 +22,8 @@ type Props = {
   status: WarrantyStatus;
   product?: string;
   productCode?: string;
+  policyCode?: string | null;
+  publicDisplay?: boolean;
   serialNumber?: string;
   warrantyStart?: string | null;
   warrantyEnd?: string | null;
@@ -36,6 +38,8 @@ export default function WarrantyResultCard(props: Props) {
     status,
     product,
     productCode,
+    policyCode,
+    publicDisplay = false,
     serialNumber,
     warrantyStart,
     warrantyEnd,
@@ -56,12 +60,15 @@ export default function WarrantyResultCard(props: Props) {
         <div className="bg-gradient-to-r from-red-700 to-red-500 p-5">
 
           <div className="flex justify-center">
-            <Image
-              src="/images/logo/suntree-logo.png"
-              alt="Suntree Myanmar"
-              width={120}
-              height={120}
-            />
+            <div className="rounded-xl border border-white/70 bg-white px-3 py-2 shadow-sm">
+              <Image
+                src="/images/logo/suntree-logo.png"
+                alt="Suntree Myanmar"
+                width={120}
+                height={50}
+                className="h-[50px] w-[120px] object-contain"
+              />
+            </div>
           </div>
 
           <div className="mt-4 flex justify-center">
@@ -95,12 +102,15 @@ export default function WarrantyResultCard(props: Props) {
         <div className="bg-gradient-to-r from-amber-600 to-orange-500 p-5">
 
           <div className="flex justify-center">
-            <Image
-              src="/images/logo/suntree-logo.png"
-              alt="Suntree Myanmar"
-              width={120}
-              height={120}
-            />
+            <div className="rounded-xl border border-white/70 bg-white px-3 py-2 shadow-sm">
+              <Image
+                src="/images/logo/suntree-logo.png"
+                alt="Suntree Myanmar"
+                width={120}
+                height={50}
+                className="h-[50px] w-[120px] object-contain"
+              />
+            </div>
           </div>
 
           <div className="mt-4 flex justify-center">
@@ -193,12 +203,15 @@ export default function WarrantyResultCard(props: Props) {
       >
 
         <div className="flex justify-center">
-          <Image
-            src="/images/logo/suntree-logo.png"
-            alt="Suntree Myanmar"
-            width={120}
-            height={120}
-          />
+          <div className="rounded-xl border border-white/70 bg-white px-3 py-2 shadow-sm">
+            <Image
+              src="/images/logo/suntree-logo.png"
+              alt="Suntree Myanmar"
+              width={120}
+              height={50}
+              className="h-[50px] w-[120px] object-contain"
+            />
+          </div>
         </div>
 
         <div className="mt-4 flex justify-center">
@@ -245,8 +258,10 @@ export default function WarrantyResultCard(props: Props) {
 
         <InfoRow
           icon={<CalendarDays size={18} />}
-          label="Warranty Period"
-          value={`${formatDate(warrantyStart)}  →  ${formatDate(warrantyEnd)}`}
+          label={publicDisplay && policyCode !== "D" && policyCode !== "E" ? "Warranty End Date" : "Warranty Period"}
+          value={publicDisplay && policyCode !== "D" && policyCode !== "E"
+            ? formatDate(warrantyEnd)
+            : `${formatDate(warrantyStart)}  →  ${formatDate(warrantyEnd)}`}
         />
 
         <InfoRow

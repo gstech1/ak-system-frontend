@@ -341,6 +341,7 @@ export default function PublicWarrantyPage() {
             <div ref={resultRef} className="mt-6">
               <WarrantyResultCard
                 status={result.status}
+                publicDisplay
                 {...result}
               />
             </div>
@@ -393,7 +394,7 @@ export default function PublicWarrantyPage() {
 
             {/* Dealer Login */}
             <Link
-              href="/login"
+              href="/warranty/dealer-login"
               className="group flex min-h-[64px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.98]"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">

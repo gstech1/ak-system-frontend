@@ -5,20 +5,27 @@ import {
   useEffect,
   useState,
 } from "react";
+import Link from "next/link";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 
 import {
-  createShipment,
+  createShipmentWithSerials,
   deleteShipment,
   getShipments,
+  getSerialByNumber,
+  getSuntreeServiceIssues,
+  createSuntreeServiceIssue,
+  completeSuntreeServiceIssue,
   type Shipment,
+  type SuntreeServiceIssue,
 } from "@/lib/api";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://localhost:5001";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001"
+).replace(/\/+$/, "");
 
 type Dealer = {
   id: string;
@@ -40,6 +47,22 @@ type Dealer = {
 export default function ShipmentsPage() {
   const [shipments, setShipments] =
     useState<Shipment[]>([]);
+  const [serviceIssues, setServiceIssues] =
+    useState<SuntreeServiceIssue[]>([]);
+  const [listMode, setListMode] = useState<"SALES" | "SERVICE">("SALES");
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [serviceSaving, setServiceSaving] = useState(false);
+  const [issueNo, setIssueNo] = useState("");
+  const [serviceDepartment, setServiceDepartment] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [servicePerson, setServicePerson] = useState("");
+  const [serviceDate, setServiceDate] = useState("");
+  const [serviceRemarks, setServiceRemarks] = useState("");
+  const [serviceScan, setServiceScan] = useState("");
+  const [serviceSerials, setServiceSerials] = useState<string[]>([]);
+  const [returnIssueId, setReturnIssueId] = useState("");
+  const [returnScan, setReturnScan] = useState("");
+  const [returnedSerials, setReturnedSerials] = useState<string[]>([]);
 
   const [dealers, setDealers] =
     useState<Dealer[]>([]);
@@ -52,6 +75,9 @@ export default function ShipmentsPage() {
 
   const [deleting, setDeleting] =
     useState("");
+
+  const [isAdmin, setIsAdmin] =
+    useState(false);
 
   const [error, setError] =
     useState("");
@@ -73,6 +99,12 @@ export default function ShipmentsPage() {
 
   const [remarks, setRemarks] =
     useState("");
+
+  const [scanSerial, setScanSerial] =
+    useState("");
+
+  const [serialNumbers, setSerialNumbers] =
+    useState<string[]>([]);
 
   function getTodayDate() {
     const today = new Date();
@@ -96,6 +128,15 @@ export default function ShipmentsPage() {
       const token =
         localStorage.getItem("accessToken");
 
+      try {
+        const authUser = JSON.parse(
+          localStorage.getItem("authUser") ?? "null",
+        );
+        setIsAdmin(authUser?.role === "ADMIN");
+      } catch {
+        setIsAdmin(false);
+      }
+
       if (!token) {
         throw new Error(
           "Login session not found. Please login again.",
@@ -104,9 +145,11 @@ export default function ShipmentsPage() {
 
       const [
         shipmentResponse,
+        serviceIssueResponse,
         dealerResponse,
       ] = await Promise.all([
         getShipments(),
+        getSuntreeServiceIssues(),
 
         fetch(`${API_BASE_URL}/dealers`, {
           headers: {
@@ -129,6 +172,7 @@ export default function ShipmentsPage() {
       }
 
       setShipments(shipmentResponse);
+      setServiceIssues(serviceIssueResponse);
 
       setDealers(
         Array.isArray(dealerData)
@@ -159,6 +203,170 @@ export default function ShipmentsPage() {
       getTodayDate(),
     );
     setRemarks("");
+    setScanSerial("");
+    setSerialNumbers([]);
+  }
+
+  function resetServiceForm() {
+    setIssueNo(`SVC-${Date.now()}`);
+    setServiceDepartment("");
+    setProjectName("");
+    setServicePerson("");
+    setServiceDate(getTodayDate());
+    setServiceRemarks("");
+    setServiceScan("");
+    setServiceSerials([]);
+  }
+
+  async function addServiceSerial() {
+    const serialNumber = serviceScan.replace(/\D/g, "");
+    if (!serialNumber) return;
+    if (!/^\d{9}$/.test(serialNumber)) {
+      setError("Serial barcode must contain exactly 9 digits.");
+      setServiceScan("");
+      return;
+    }
+    if (serviceSerials.includes(serialNumber)) {
+      setError(`Serial ${serialNumber} is already in this service issue.`);
+      setServiceScan("");
+      return;
+    }
+    try {
+      const serial = await getSerialByNumber(serialNumber);
+      if (serial.status !== "IN_STOCK" || !(serial.productId || serial.product?.id)) {
+        throw new Error(`Only product-assigned IN_STOCK serials can be issued. Current status: ${serial.status}.`);
+      }
+      setServiceSerials((current) => [...current, serialNumber]);
+      setServiceScan("");
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Serial ${serialNumber} could not be added.`);
+      setServiceScan("");
+    }
+  }
+
+  async function handleServiceIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!serviceSerials.length) {
+      setError("Scan at least one serial for this service issue.");
+      return;
+    }
+    try {
+      setServiceSaving(true);
+      setError("");
+      await createSuntreeServiceIssue({
+        issueNo: issueNo.trim(),
+        serviceDepartment: serviceDepartment.trim(),
+        projectName: projectName.trim(),
+        servicePerson: servicePerson.trim(),
+        issuedDate: serviceDate,
+        remarks: serviceRemarks.trim() || undefined,
+        serialNumbers: serviceSerials,
+      });
+      setSuccess(`Service issue ${issueNo} created with ${serviceSerials.length} serial(s).`);
+      setShowServiceForm(false);
+      resetServiceForm();
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create service issue.");
+    } finally {
+      setServiceSaving(false);
+    }
+  }
+
+  async function addReturnedSerial() {
+    const serialNumber = returnScan.replace(/\D/g, "");
+    if (!serialNumber || !returnIssueId) return;
+    const issue = serviceIssues.find((item) => item.id === returnIssueId);
+    const eligible = issue?.items.some((item) => item.serial.serialNumber === serialNumber && item.disposition === "ISSUED");
+    if (!eligible) {
+      setError(`Serial ${serialNumber} is not an outstanding serial in this service issue.`);
+      setReturnScan("");
+      return;
+    }
+    if (returnedSerials.includes(serialNumber)) {
+      setError(`Serial ${serialNumber} has already been scanned as returned.`);
+      setReturnScan("");
+      return;
+    }
+    setReturnedSerials((current) => [...current, serialNumber]);
+    setReturnScan("");
+    setError("");
+  }
+
+  async function handleCompleteServiceReturn() {
+    const issue = serviceIssues.find((item) => item.id === returnIssueId);
+    if (!issue) return;
+    const soldCount = issue.items.length - returnedSerials.length;
+    const confirmed = window.confirm(
+      `Close ${issue.issueNo}? ${returnedSerials.length} serial(s) will return to stock; ${soldCount} unreturned serial(s) will be recorded as sold and warranty activated under ${issue.dealerName}.`,
+    );
+    if (!confirmed) return;
+    try {
+      setServiceSaving(true);
+      setError("");
+      await completeSuntreeServiceIssue(issue.id, returnedSerials);
+      setSuccess(`Service issue ${issue.issueNo} closed. Returned: ${returnedSerials.length}; sold with active warranty: ${soldCount}.`);
+      setReturnIssueId("");
+      setReturnedSerials([]);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to complete service return.");
+    } finally {
+      setServiceSaving(false);
+    }
+  }
+
+  async function addScannedSerial() {
+    const serialNumber = scanSerial.replace(/\D/g, "");
+
+    if (!serialNumber) return;
+
+    if (!/^\d{9}$/.test(serialNumber)) {
+      setError("Serial barcode must contain exactly 9 digits.");
+      return;
+    }
+
+    if (serialNumbers.includes(serialNumber)) {
+      setError(`Serial ${serialNumber} is already in this shipment.`);
+      setScanSerial("");
+      return;
+    }
+
+    try {
+      const serial = await getSerialByNumber(serialNumber);
+
+      if (serial.status !== "IN_STOCK") {
+        setError(
+          `Serial ${serialNumber} cannot be added because its status is ${serial.status}. Only warehouse IN_STOCK serials can be shipped.`,
+        );
+        setScanSerial("");
+        return;
+      }
+
+      if (!serial.productId && !serial.product?.id) {
+        setError(
+          `Serial ${serialNumber} is not assigned to a product and cannot be shipped.`,
+        );
+        setScanSerial("");
+        return;
+      }
+
+      setSerialNumbers((current) =>
+        current.includes(serialNumber)
+          ? current
+          : [...current, serialNumber],
+      );
+      setScanSerial("");
+      setError("");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Serial ${serialNumber} was not added: ${err.message}`
+          : `Serial ${serialNumber} was not found in Serial Management.`,
+      );
+      setScanSerial("");
+    }
   }
 
   async function handleCreate(
@@ -187,22 +395,34 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (serialNumbers.length === 0) {
+      setError("Scan or add at least one serial before creating the shipment.");
+      return;
+    }
+
+    const dealerName = dealers.find((dealer) => dealer.id === dealerId)?.companyName;
+    const confirmed = window.confirm(
+      `Create and complete this shipment for ${dealerName ?? "the selected dealer"} with ${serialNumbers.length} serial(s)? The serials will be marked SHIPPED.`,
+    );
+    if (!confirmed) return;
+
     try {
       setSaving(true);
       setError("");
       setSuccess("");
 
-      await createShipment({
+      await createShipmentWithSerials({
         shipmentNo:
           shipmentNo.trim(),
         dealerId,
         shipmentDate,
         remarks:
           remarks.trim() || undefined,
+        serialNumbers,
       });
 
       setSuccess(
-        "Shipment created successfully.",
+        `Shipment ${shipmentNo.trim()} created and completed with ${serialNumbers.length} serial(s).`,
       );
 
       resetForm();
@@ -225,16 +445,16 @@ export default function ShipmentsPage() {
   async function handleDelete(
     shipment: Shipment,
   ) {
-    if (shipment.status !== "DRAFT") {
+    if (shipment.status !== "DRAFT" && !isAdmin) {
       setError(
-        "Only DRAFT shipments can be deleted.",
+        "Only an Admin can delete a completed shipment.",
       );
       return;
     }
 
     const confirmed =
       window.confirm(
-        `Delete shipment ${shipment.shipmentNo}?`,
+        `Delete shipment ${shipment.shipmentNo}? Unused serials will return to warehouse stock. Shipments with warranty or replacement history cannot be deleted.`,
       );
 
     if (!confirmed) {
@@ -291,6 +511,10 @@ export default function ShipmentsPage() {
     ).toLocaleDateString();
   }
 
+  const serviceSoldIssues = serviceIssues.filter((issue) =>
+    issue.items.some((item) => item.disposition === "SOLD"),
+  );
+
   function getStatusClass(
     status: string,
   ) {
@@ -315,22 +539,21 @@ export default function ShipmentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
           <PageTitle
-            title="Shipments"
-            subtitle="Manage dealer shipments and shipment records."
+            title="Stock Out"
+            subtitle="Record dealer sales and service team stock issues in one place."
           />
-
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              setSuccess("");
-              resetForm();
-              setShowForm(true);
-            }}
-            className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700"
-          >
-            + Create Shipment
-          </button>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => {
+              setError(""); setSuccess(""); setShowServiceForm(false); resetForm(); setShowForm(true); setListMode("SALES");
+            }} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">
+              + Create Shipment
+            </button>
+            <button type="button" onClick={() => {
+              setError(""); setSuccess(""); setShowForm(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
+            }} className="rounded-xl border border-emerald-700 bg-white px-5 py-3 font-bold text-emerald-800 transition hover:bg-emerald-50">
+              Service Issue / Return
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -346,17 +569,95 @@ export default function ShipmentsPage() {
           </div>
         )}
 
+        {showServiceForm && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">Service Issue</h2>
+                <p className="mt-1 text-sm text-slate-500">Record who took the serials and where they will be used. Scan returned units later to close the issue.</p>
+              </div>
+              <button type="button" onClick={() => setShowServiceForm(false)} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancel</button>
+            </div>
+            <form onSubmit={handleServiceIssue} className="grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700">Issue No.
+                <input required value={issueNo} onChange={(e) => setIssueNo(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Service Department
+                <input required value={serviceDepartment} onChange={(e) => setServiceDepartment(e.target.value)} placeholder="e.g. Service Department" className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Project Name
+                <input required value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Project / site name" className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Service Person
+                <input required value={servicePerson} onChange={(e) => setServicePerson(e.target.value)} placeholder="Technician name" className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Issue Date
+                <input required type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Remarks
+                <input value={serviceRemarks} onChange={(e) => setServiceRemarks(e.target.value)} placeholder="Optional remarks" className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-4 font-normal" />
+              </label>
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Scan Serial Barcodes</label>
+                <div className="flex gap-2">
+                  <input value={serviceScan} onChange={(e) => setServiceScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addServiceSerial(); } }} placeholder="Scan serial; scanner Enter adds it" inputMode="numeric" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-4 font-mono text-sm" />
+                  <button type="button" onClick={() => void addServiceSerial()} className="rounded-xl border border-slate-300 px-5 font-semibold">Add Serial</button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {serviceSerials.map((serial) => <button key={serial} type="button" onClick={() => setServiceSerials((items) => items.filter((item) => item !== serial))} className="rounded-lg bg-slate-50 px-3 py-2 font-mono text-sm ring-1 ring-slate-200">{serial.replace(/(\d{3})(?=\d)/g, "$1 ")} <span className="text-red-600">×</span></button>)}
+                </div>
+              </div>
+              <div className="flex justify-end md:col-span-2">
+                <button disabled={serviceSaving} type="submit" className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60">{serviceSaving ? "Saving..." : "Issue Serials to Service"}</button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {returnIssueId && (() => {
+          const issue = serviceIssues.find((item) => item.id === returnIssueId);
+          if (!issue) return null;
+          return (
+            <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Service Return · {issue.issueNo}</h2>
+                  <p className="mt-1 text-sm text-slate-500">Scan only the serials physically returned. Anything left unscanned will be recorded as sold and warranty will start.</p>
+                </div>
+                <button type="button" onClick={() => { setReturnIssueId(""); setReturnedSerials([]); }} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancel</button>
+              </div>
+              <p className="mb-4 text-sm text-slate-600">{issue.serviceDepartment} · {issue.projectName} · {issue.servicePerson}</p>
+              <div className="flex gap-2">
+                <input value={returnScan} onChange={(e) => setReturnScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addReturnedSerial(); } }} placeholder="Scan returned serial and press Enter" inputMode="numeric" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-4 font-mono text-sm" />
+                <button type="button" onClick={() => void addReturnedSerial()} className="rounded-xl border border-slate-300 px-5 font-semibold">Add Return</button>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {issue.items.filter((item) => item.disposition === "ISSUED").map((item) => {
+                  const returned = returnedSerials.includes(item.serial.serialNumber);
+                  return <div key={item.id} className={`rounded-xl border px-3 py-2 text-sm ${returned ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                    <span className="font-mono">{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}</span>
+                    <span className="float-right font-semibold">{returned ? "Returned" : "Pending"}</span>
+                  </div>;
+                })}
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button type="button" disabled={serviceSaving} onClick={() => void handleCompleteServiceReturn()} className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60">{serviceSaving ? "Saving..." : "Complete Return & Record Sales"}</button>
+              </div>
+            </section>
+          );
+        })()}
+
         {/* Create Form */}
         {showForm && (
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
+                <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
                   Create Shipment
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Create a new draft shipment for a dealer.
+                  Enter shipment details and scan the serial barcodes, then save once.
                 </p>
               </div>
 
@@ -418,7 +719,7 @@ export default function ShipmentsPage() {
                         key={dealer.id}
                         value={dealer.id}
                       >
-                        {dealer.companyName}
+                        {dealer.dealerCode} — {dealer.companyName}
                       </option>
                     ),
                   )}
@@ -464,6 +765,68 @@ export default function ShipmentsPage() {
                 />
               </div>
 
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Scan / Enter Serial Barcodes
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={scanSerial}
+                    onChange={(event) => setScanSerial(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addScannedSerial();
+                      }
+                    }}
+                    placeholder="Scan barcode here; press Enter after each serial"
+                    inputMode="numeric"
+                    className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-4 font-mono text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={addScannedSerial}
+                    className="shrink-0 rounded-xl border border-slate-300 px-5 font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Add Serial
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  A barcode scanner that types into the field and sends Enter will add each serial automatically.
+                </p>
+
+                {serialNumbers.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 text-sm font-semibold text-slate-700">
+                      {serialNumbers.length} serial(s) scanned
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {serialNumbers.map((serialNumber) => (
+                        <span
+                          key={serialNumber}
+                          className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-mono text-sm text-slate-700 ring-1 ring-slate-200"
+                        >
+                          {serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSerialNumbers((current) =>
+                                current.filter((value) => value !== serialNumber),
+                              )
+                            }
+                            aria-label={`Remove serial ${serialNumber}`}
+                            className="font-sans font-bold text-red-600 hover:text-red-800"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end md:col-span-2">
                 <button
                   type="submit"
@@ -472,7 +835,7 @@ export default function ShipmentsPage() {
                 >
                   {saving
                     ? "Creating..."
-                    : "Create Shipment"}
+                    : "Create & Complete Shipment"}
                 </button>
               </div>
             </form>
@@ -482,23 +845,27 @@ export default function ShipmentsPage() {
         {/* Shipment List */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-lg font-bold text-slate-900">
-              Shipment List
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              {shipments.length} shipment
-              {shipments.length === 1
-                ? ""
-                : "s"} recorded in the system.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {listMode === "SALES" ? "Sales / Shipment List" : "Service Issue / Return List"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {listMode === "SALES" ? `${shipments.length} dealer shipment(s) · ${serviceSoldIssues.length} service sale(s)` : `${serviceIssues.length} service issue(s) recorded.`}
+                </p>
+              </div>
+              <div className="flex rounded-xl bg-slate-100 p-1">
+                <button type="button" onClick={() => setListMode("SALES")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${listMode === "SALES" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>Sales</button>
+                <button type="button" onClick={() => setListMode("SERVICE")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${listMode === "SERVICE" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>Service Use</button>
+              </div>
+            </div>
           </div>
 
           {loading ? (
             <div className="px-6 py-12 text-center text-sm text-slate-500">
               Loading shipments...
             </div>
-          ) : shipments.length === 0 ? (
+          ) : listMode === "SALES" && shipments.length === 0 && serviceSoldIssues.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="font-semibold text-slate-700">
                 No shipments found.
@@ -508,7 +875,8 @@ export default function ShipmentsPage() {
                 Create a shipment to get started.
               </p>
             </div>
-          ) : (
+          ) : listMode === "SALES" ? (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -540,6 +908,7 @@ export default function ShipmentsPage() {
                 </thead>
 
                 <tbody>
+                  {shipments.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">No dealer shipments recorded yet.</td></tr>}
                   {shipments.map(
                     (shipment) => (
                       <tr
@@ -547,7 +916,12 @@ export default function ShipmentsPage() {
                         className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
                       >
                         <td className="px-6 py-4 font-mono text-sm font-semibold text-slate-900">
-                          {shipment.shipmentNo}
+                          <Link
+                            href={`/shipments/${shipment.id}`}
+                            className="text-emerald-700 hover:underline"
+                          >
+                            {shipment.shipmentNo}
+                          </Link>
                         </td>
 
                         <td className="px-6 py-4 text-sm font-medium text-slate-700">
@@ -578,8 +952,14 @@ export default function ShipmentsPage() {
                         </td>
 
                         <td className="px-6 py-4 text-right">
-                          {shipment.status ===
-                            "DRAFT" && (
+                          <Link
+                            href={`/shipments/${shipment.id}`}
+                            className="mr-2 inline-flex rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            View
+                          </Link>
+                          {(shipment.status ===
+                            "DRAFT" || isAdmin) && (
                             <button
                               type="button"
                               onClick={() =>
@@ -605,6 +985,55 @@ export default function ShipmentsPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+          {serviceSoldIssues.length > 0 && <div className="border-t border-slate-200">
+            <div className="bg-slate-50 px-6 py-3 text-sm font-bold text-slate-700">Sales from Service Projects</div>
+            <div className="divide-y divide-slate-100">
+              {serviceSoldIssues.map((issue) => {
+                const soldItems = issue.items.filter((item) => item.disposition === "SOLD");
+                return <div key={issue.id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+                  <div><p className="font-semibold text-slate-800">{issue.serviceDepartment} · {issue.projectName}</p><p className="mt-1 text-xs text-slate-500">{issue.issueNo} · {formatDate(issue.issuedDate)} · Dealer label: {issue.dealerName}</p><div className="mt-2 flex flex-wrap gap-2">{soldItems.map((item) => <span key={item.id} className="rounded-md bg-blue-50 px-2 py-1 font-mono text-xs text-blue-800">{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}</span>)}</div></div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">{soldItems.length} sold · Warranty active</span>
+                </div>;
+              })}
+            </div>
+          </div>}
+            </>
+          ) : serviceIssues.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="font-semibold text-slate-700">No service issues found.</p>
+              <p className="mt-1 text-sm text-slate-500">Create a service issue to record serials taken by the service team.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {serviceIssues.map((issue) => {
+                const returnedCount = issue.items.filter((item) => item.disposition === "RETURNED").length;
+                const soldCount = issue.items.filter((item) => item.disposition === "SOLD").length;
+                const outstandingCount = issue.items.filter((item) => item.disposition === "ISSUED").length;
+                return <article key={issue.id} className="p-5 sm:p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-bold text-emerald-700">{issue.issueNo}</span>
+                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${issue.status === "OPEN" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{issue.status}</span>
+                      </div>
+                      <p className="mt-2 font-semibold text-slate-900">{issue.serviceDepartment} · {issue.projectName}</p>
+                      <p className="mt-1 text-sm text-slate-500">Service person: {issue.servicePerson} · Issued: {formatDate(issue.issuedDate)}</p>
+                      {issue.remarks && <p className="mt-1 text-sm text-slate-500">{issue.remarks}</p>}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-slate-100 px-3 py-1.5">{issue.items.length} issued</span>
+                      <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{returnedCount} returned</span>
+                      <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">{soldCount} sold · warranty active</span>
+                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {issue.items.map((item) => <span key={item.id} className={`rounded-lg px-3 py-2 font-mono text-xs ${item.disposition === "RETURNED" ? "bg-emerald-50 text-emerald-800" : item.disposition === "SOLD" ? "bg-blue-50 text-blue-800" : "bg-amber-50 text-amber-800"}`} title={item.serial.product?.name ?? ""}>{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")} · {item.disposition}</span>)}
+                  </div>
+                  {issue.status === "OPEN" && <p className="mt-3 text-xs text-slate-500">{outstandingCount} serial(s) still awaiting return scan. Unscanned serials become sold and are registered for warranty when the issue is closed.</p>}
+                </article>;
+              })}
             </div>
           )}
         </section>

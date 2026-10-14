@@ -1,6 +1,12 @@
-"use client";
+﻿"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
 
 import { usePathname } from "next/navigation";
+import { Truck } from "lucide-react";
 
 import { SIDEBAR_MENU } from "@/constants/menu";
 
@@ -11,45 +17,115 @@ type AuthUser = {
   permissions?: string[];
 };
 
-const WEBSITE_MANAGEMENT_URL =
-  "http://localhost:3001/dashboard/website";
-
-function getWebsiteManagementUrl(
-  href: string,
-) {
-  if (href === "/website-management/products") {
-    return `${WEBSITE_MANAGEMENT_URL}/products`;
-  }
-
-  if (href === "/projects") {
-    return `${WEBSITE_MANAGEMENT_URL}/projects`;
-  }
-
-  if (href === "/website-management/ads") {
-    return `${WEBSITE_MANAGEMENT_URL}/ads`;
-  }
-
-  return WEBSITE_MANAGEMENT_URL;
-}
-
 export default function Sidebar() {
   const pathname = usePathname();
 
-  let authUser: AuthUser | null = null;
+  /*
+   * Auth user is loaded only on the client.
+   *
+   * This prevents hydration mismatch because
+   * localStorage does not exist during SSR.
+   */
+  const [authUser, setAuthUser] =
+    useState<AuthUser | null>(null);
 
-  if (typeof window !== "undefined") {
+  const [authLoaded, setAuthLoaded] =
+    useState(false);
+
+  /*
+   * Load authenticated user
+   * after the component mounts.
+   */
+  useEffect(() => {
     try {
       const storedUser =
-        localStorage.getItem("authUser");
+        localStorage.getItem(
+          "authUser",
+        );
 
       if (storedUser) {
-        authUser = JSON.parse(
-          storedUser,
+        setAuthUser(
+          JSON.parse(storedUser),
         );
       }
     } catch {
-      authUser = null;
+      setAuthUser(null);
+    } finally {
+      setAuthLoaded(true);
     }
+  }, []);
+
+  /*
+   * While authentication data is loading,
+   * keep the server and first client render
+   * identical.
+   */
+  if (!authLoaded) {
+    return (
+      <aside className="flex h-screen w-72 flex-col bg-slate-900 text-white">
+        {/* System Switcher */}
+<div className="border-b border-slate-800 p-4">
+  <a
+    href="/warehouse/products"
+    className="mb-2 block rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 transition hover:bg-blue-500/20"
+  >
+    <p className="text-lg font-bold text-blue-400">
+      MTK Solar
+    </p>
+
+    <p className="mt-1 text-xs text-slate-400">
+      Solar Warehouse System
+    </p>
+  </a>
+
+  <a
+    href="/dashboard"
+    className="block rounded-xl bg-slate-800 px-4 py-3 transition hover:bg-slate-700"
+  >
+    <p className="text-lg font-bold text-emerald-400">
+      SuntreeMyanmar
+    </p>
+
+    <p className="mt-1 text-xs text-slate-400">
+      Warranty System
+    </p>
+  </a>
+</div>
+
+
+
+        {/* Loading User Area */}
+        <div className="border-b border-slate-800 px-5 py-4">
+          <p className="text-xs uppercase tracking-wider text-slate-500">
+            Signed in as
+          </p>
+
+          <p className="mt-1 font-semibold text-white">
+            User
+          </p>
+
+          <p className="mt-1 text-xs font-medium text-emerald-400">
+            Unknown Role
+          </p>
+        </div>
+
+        {/* Loading Menu */}
+        <nav className="flex-1 overflow-y-auto px-4 py-5" />
+
+        {/* Footer */}
+        <div className="border-t border-slate-800 p-5">
+          <div className="rounded-xl bg-slate-800 p-4">
+            <p className="font-semibold text-white">
+              GS Art & Management System
+            </p>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Version 1.0.0
+            </p>
+          </div>
+        </div>
+      </aside>
+    );
   }
 
   const role = authUser?.role ?? "";
@@ -60,7 +136,8 @@ export default function Sidebar() {
   /*
    * SUPER ADMIN / ADMIN
    *
-   * ADMIN is treated as the highest system access.
+   * ADMIN is treated as the highest
+   * system access.
    */
   const isAdmin =
     role === "ADMIN";
@@ -159,16 +236,7 @@ export default function Sidebar() {
 
   return (
     <aside className="flex h-screen w-72 flex-col bg-slate-900 text-white">
-      {/* Logo */}
-      <div className="border-b border-slate-800 p-6">
-        <h1 className="text-2xl font-black tracking-wide text-emerald-400">
-          SuntreeMyanmar
-        </h1>
-
-        <p className="mt-1 text-sm text-slate-400">
-          Warranty System
-        </p>
-      </div>
+      {/* System Switcher */}<div className="border-b border-slate-800 p-4"><a href="/warehouse/products" className="mb-2 block rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 transition hover:bg-blue-500/20"><p className="text-lg font-bold text-blue-400">MTK Solar</p><p className="mt-1 text-xs text-slate-400">Solar Warehouse System</p></a><a href="/dashboard" className="block rounded-xl bg-slate-800 px-4 py-3 transition hover:bg-slate-700"><p className="text-lg font-bold text-emerald-400">SuntreeMyanmar</p><p className="mt-1 text-xs text-slate-400">Warranty System</p></a></div>
 
       {/* User Role */}
       <div className="border-b border-slate-800 px-5 py-4">
@@ -186,6 +254,23 @@ export default function Sidebar() {
             "Unknown Role"}
         </p>
       </div>
+
+      {/* Frequent Suntree stock-out action */}
+      {hasPermission("SHIPMENTS_VIEW") && (
+        <div className="px-4 pt-4">
+          <a
+            href="/shipments"
+            className={`flex items-center gap-3 rounded-xl px-4 py-3 font-semibold transition-all ${
+              pathname === "/shipments" || pathname.startsWith("/shipments/")
+                ? "bg-emerald-600 text-white shadow-lg"
+                : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+            }`}
+          >
+            <Truck size={18} />
+            <span>Stock Out</span>
+          </a>
+        </div>
+      )}
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto px-4 py-5">
@@ -212,46 +297,6 @@ export default function Sidebar() {
                     const active =
                       activeHref ===
                       item.href;
-
-                    const isWebsiteManagement =
-                      item.href ===
-                        "/website-management/products" ||
-                      item.href ===
-                        "/projects" ||
-                      item.href ===
-                        "/website-management/ads";
-
-                    if (
-                      isWebsiteManagement
-                    ) {
-                      return (
-                        <a
-                          key={
-                            item.href
-                          }
-                          href={getWebsiteManagementUrl(
-                            item.href,
-                          )}
-                          className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all ${
-                            active
-                              ? "bg-emerald-600 text-white shadow-lg"
-                              : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                          }`}
-                        >
-                          <Icon
-                            size={
-                              18
-                            }
-                          />
-
-                          <span className="font-medium">
-                            {
-                              item.title
-                            }
-                          </span>
-                        </a>
-                      );
-                    }
 
                     return (
                       <a
@@ -319,3 +364,9 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+
+
+
+
+

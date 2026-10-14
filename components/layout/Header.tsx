@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type AuthUser = {
   id?: string;
@@ -12,7 +13,21 @@ type AuthUser = {
 };
 
 export default function Header() {
+  const pathname = usePathname();
+
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [language, setLanguage] = useState<"en" | "my">("en");
+
+  function changeLanguage(nextLanguage: "en" | "my") {
+    setLanguage(nextLanguage);
+    localStorage.setItem("dashboardLanguage", nextLanguage);
+
+    window.dispatchEvent(
+      new CustomEvent("dashboard-language-change", {
+        detail: nextLanguage,
+      }),
+    );
+  }
 
   useEffect(() => {
     try {
@@ -28,6 +43,15 @@ export default function Header() {
     }
   }, []);
 
+  // Only MTK Solar Warehouse uses MTK header.
+  const isMTKSolar =
+    pathname === "/warehouse" ||
+    pathname.startsWith("/warehouse/");
+
+  const systemName = isMTKSolar
+    ? "MTK Solar"
+    : "SuntreeMyanmar";
+
   const isAdmin = user?.role === "ADMIN";
 
   const displayName = isAdmin
@@ -41,28 +65,63 @@ export default function Header() {
         user.role.slice(1).toLowerCase()
       : "User";
 
-  const avatarLetter = displayName.charAt(0).toUpperCase();
+  const avatarLetter = displayName
+    .charAt(0)
+    .toUpperCase();
 
   function handleLogout() {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("authUser");
-
     window.location.href = "/login";
   }
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Dashboard
+        <h1
+          className={`text-3xl font-bold tracking-tight ${
+            isMTKSolar
+              ? "text-blue-700"
+              : "text-emerald-700"
+          }`}
+        >
+          {systemName} Dashboard
         </h1>
 
-        <p className="text-sm text-slate-500">
+        <p className="mt-1 text-sm text-slate-500">
           Welcome back, {displayName}
         </p>
       </div>
 
       <div className="flex items-center gap-4">
+        {isMTKSolar && (
+          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => changeLanguage("en")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                language === "en"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              EN
+            </button>
+
+            <button
+              type="button"
+              onClick={() => changeLanguage("my")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                language === "my"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              မြန်မာ
+            </button>
+          </div>
+        )}
+
         <div className="relative">
           <Search
             size={18}
@@ -72,13 +131,13 @@ export default function Header() {
           <input
             type="text"
             placeholder="Search..."
-            className="h-10 w-72 rounded-xl border border-slate-200 pl-10 pr-4 outline-none focus:border-emerald-500"
+            className="h-10 w-72 rounded-xl border border-slate-200 pl-10 pr-4 outline-none transition focus:border-emerald-500"
           />
         </div>
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-100"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 transition hover:bg-slate-100"
         >
           <Bell size={18} />
         </button>
@@ -89,7 +148,7 @@ export default function Header() {
           </div>
 
           <div>
-            <p className="text-sm font-semibold">
+            <p className="text-sm font-semibold text-slate-900">
               {displayName}
             </p>
 
