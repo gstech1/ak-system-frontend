@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import MTKSolarShell from "@/components/layout/MTKSolarShell";
+import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 type VoucherItem = {
   id: string;
@@ -417,6 +418,26 @@ export default function VoucherHistoryPage() {
     setTimeout(() => {
       printWindow.print();
     }, 300);
+  };
+
+  const printThermalVoucher = (voucher: Voucher) => {
+    const opened = printThermalReceipt({
+      brand: "MTK Solar Warehouse System",
+      title: "WAREHOUSE STOCK OUT",
+      number: voucher.stockOutNo,
+      date: new Date(voucher.salesDate).toLocaleDateString(),
+      recipientLabel: "Customer",
+      recipient: voucher.customer || "Walk-in Customer",
+      status: voucher.status,
+      note: voucher.remark,
+      lines: voucher.items.map((item) => ({
+        name: item.product?.productName || "Unknown Product",
+        code: item.product?.productCode,
+        serial: item.barcode,
+        quantity: item.quantity,
+      })),
+    });
+    if (!opened) window.alert("Allow pop-ups for this dashboard to print the receipt.");
   };
 
   return (
@@ -836,7 +857,15 @@ export default function VoucherHistoryPage() {
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700"
               >
                 <Printer size={17} />
-                Print Voucher
+                Print A4 Voucher
+              </button>
+              <button
+                type="button"
+                onClick={() => printThermalVoucher(selectedVoucher)}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-black text-white transition hover:bg-slate-800"
+              >
+                <Printer size={17} />
+                Print 80 mm Receipt
               </button>
               </div>
             </div>

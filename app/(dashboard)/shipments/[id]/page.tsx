@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Printer } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
@@ -13,6 +14,7 @@ import {
   type Shipment,
   type ShipmentSerial,
 } from "@/lib/api";
+import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 function formatDate(value?: string | null) {
   return value
@@ -187,6 +189,37 @@ export default function ShipmentDetailsPage() {
     }
   }
 
+  function printShipmentReceipt() {
+    if (!shipment) return;
+    const opened = printThermalReceipt({
+      brand: "Suntree Myanmar",
+      title: "DEALER STOCK ISSUE",
+      number: shipment.shipmentNo,
+      date: formatDate(shipment.shipmentDate),
+      recipientLabel: "Dealer",
+      recipient: `${shipment.dealer?.dealerCode ?? shipment.dealerId} · ${shipment.dealer?.companyName ?? "Dealer"}`,
+      status: shipment.status,
+      note: shipment.remarks,
+      lines: (shipment.items ?? []).flatMap((item) => {
+        const serials = item.serials ?? [];
+        if (serials.length) {
+          return serials.map((serial) => ({
+            name: item.product?.name ?? "Product",
+            code: item.product?.productCode,
+            serial: serial.serialNumber,
+            quantity: 1,
+          }));
+        }
+        return [{
+          name: item.product?.name ?? "Product",
+          code: item.product?.productCode,
+          quantity: item.quantity,
+        }];
+      }),
+    });
+    if (!opened) window.alert("Allow pop-ups for this dashboard to print the receipt.");
+  }
+
   return (
     <DashboardShell>
       <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -223,9 +256,14 @@ export default function ShipmentDetailsPage() {
         ) : shipment ? (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">
-                {shipment.shipmentNo}
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {shipment.shipmentNo}
+                </h2>
+                <button type="button" onClick={printShipmentReceipt} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800">
+                  <Printer size={17} /> Print 80 mm Receipt
+                </button>
+              </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div className="rounded-xl bg-slate-50 p-4">
                   <div className="text-xs font-bold uppercase text-slate-500">Dealer</div>

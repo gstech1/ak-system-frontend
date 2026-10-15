@@ -9,10 +9,12 @@ import {
   ChevronUp,
   CircleDollarSign,
   Package,
+  Printer,
   RefreshCw,
   ShoppingCart,
   Trash2,
 } from "lucide-react";
+import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 
 
@@ -417,6 +419,26 @@ async function loadStockOutHistory() {
           item.quantity,
       0,
     );
+
+  function printSalesOutReceipt(transaction: StockOutRecord) {
+    const opened = printThermalReceipt({
+      brand: "MTK Solar Warehouse System",
+      title: "SALES OUT RECEIPT",
+      number: transaction.stockOutNo,
+      date: new Date(transaction.salesDate).toLocaleDateString(),
+      recipientLabel: "Customer",
+      recipient: transaction.customer || "Walk-in Customer",
+      status: transaction.status,
+      note: transaction.remark,
+      lines: transaction.items.map((item) => ({
+        name: item.product?.productName || item.product?.productCode || "Product",
+        code: item.product?.productCode,
+        serial: item.barcode,
+        quantity: item.quantity,
+      })),
+    });
+    if (!opened) window.alert("Allow pop-ups for this dashboard to print the receipt.");
+  }
 
   async function handleConfirm() {
     setErrorMessage("");
@@ -1051,7 +1073,14 @@ setRemark("");
         </div>
       </div>
 
-      <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-6 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={() => printSalesOutReceipt(selectedStockOut)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+        >
+          <Printer size={17} /> Print 80 mm Receipt
+        </button>
         <button
           type="button"
           onClick={() =>

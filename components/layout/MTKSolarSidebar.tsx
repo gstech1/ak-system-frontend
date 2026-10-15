@@ -12,6 +12,7 @@ import {
   Package,
   PackagePlus,
   RotateCcw,
+  ScanBarcode,
   ShoppingCart,
   Wrench,
 } from "lucide-react";
@@ -46,6 +47,11 @@ const MENU_SECTIONS: MenuSection[] = [
         title: "Register Product",
         href: "/warehouse/products/register",
         icon: PackagePlus,
+      },
+      {
+        title: "Barcode Printing",
+        href: "/warehouse/barcode-print",
+        icon: ScanBarcode,
       },
     ],
   },
@@ -170,6 +176,11 @@ export default function MTKSolarSidebar() {
       language === "my"
         ? "ကုန်ပစ္စည်းစာရင်းသွင်းရန်"
         : "Register Product",
+
+    barcodePrinting:
+      language === "my"
+        ? "ဘားကုတ်ထုတ်ခြင်း"
+        : "Barcode Printing",
 
     warehouseSection:
       language === "my"
@@ -372,6 +383,9 @@ export default function MTKSolarSidebar() {
                       : item.title ===
                           "Register Product"
                         ? t.registerProduct
+                        : item.title ===
+                            "Barcode Printing"
+                          ? t.barcodePrinting
                         : item.title ===
                             "Stock IN"
                           ? t.stockIn

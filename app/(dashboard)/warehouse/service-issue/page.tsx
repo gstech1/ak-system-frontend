@@ -9,12 +9,14 @@ import {
   ClipboardList,
   History,
   Package,
+  Printer,
   Plus,
   RefreshCw,
   Trash2,
   UserRound,
   Wrench,
 } from "lucide-react";
+import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 import MTKSolarShell from "@/components/layout/MTKSolarShell";
 
@@ -482,6 +484,25 @@ export default function ServiceIssuePage() {
         ),
       [history],
     );
+
+  function printServiceIssueReceipt(issue: ServiceIssueHistory) {
+    const opened = printThermalReceipt({
+      brand: "MTK Solar Warehouse System",
+      title: "SERVICE ISSUE RECEIPT",
+      number: issue.serviceIssueNo,
+      date: formatDate(issue.issuedDate),
+      recipientLabel: "Service Team",
+      recipient: issue.serviceTeam,
+      status: issue.status,
+      note: issue.remark,
+      lines: issue.items.map((item) => ({
+        name: item.product.productName,
+        code: item.product.productCode,
+        quantity: item.quantity,
+      })),
+    });
+    if (!opened) window.alert("Allow pop-ups for this dashboard to print the receipt.");
+  }
 
   function formatDate(
     value: string,
@@ -983,7 +1004,7 @@ export default function ServiceIssuePage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1100px] text-left">
+                  <table className="w-full min-w-[1200px] text-left">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
                         <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -1008,6 +1029,9 @@ export default function ServiceIssuePage() {
 
                         <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
                           Status
+                        </th>
+                        <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Receipt
                         </th>
                       </tr>
                     </thead>
@@ -1131,6 +1155,16 @@ export default function ServiceIssuePage() {
                                     issue.status
                                   }
                                 </span>
+                              </td>
+
+                              <td className="px-5 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => printServiceIssueReceipt(issue)}
+                                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"
+                                >
+                                  <Printer size={15} /> Print 80 mm
+                                </button>
                               </td>
                             </tr>
                           );

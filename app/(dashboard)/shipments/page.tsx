@@ -9,6 +9,7 @@ import Link from "next/link";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
+import { Printer } from "lucide-react";
 
 import {
   createShipmentWithSerials,
@@ -21,6 +22,7 @@ import {
   type Shipment,
   type SuntreeServiceIssue,
 } from "@/lib/api";
+import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -509,6 +511,26 @@ export default function ShipmentsPage() {
     return new Date(
       value,
     ).toLocaleDateString();
+  }
+
+  function printServiceReceipt(issue: SuntreeServiceIssue) {
+    const opened = printThermalReceipt({
+      brand: "Suntree Myanmar",
+      title: "SERVICE ISSUE RECEIPT",
+      number: issue.issueNo,
+      date: formatDate(issue.issuedDate),
+      recipientLabel: "Service Team",
+      recipient: `${issue.serviceDepartment} · ${issue.projectName} · ${issue.servicePerson}`,
+      status: issue.status,
+      note: issue.remarks,
+      lines: issue.items.map((item) => ({
+        name: item.serial.product?.name ?? "Product",
+        code: item.serial.product?.productCode,
+        serial: item.serial.serialNumber,
+        quantity: 1,
+      })),
+    });
+    if (!opened) window.alert("Allow pop-ups for this dashboard to print the receipt.");
   }
 
   const serviceSoldIssues = serviceIssues.filter((issue) =>
@@ -1025,6 +1047,7 @@ export default function ShipmentsPage() {
                       <span className="rounded-full bg-slate-100 px-3 py-1.5">{issue.items.length} issued</span>
                       <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{returnedCount} returned</span>
                       <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">{soldCount} sold · warranty active</span>
+                      <button type="button" onClick={() => printServiceReceipt(issue)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"><Printer size={15} /> Print 80 mm</button>
                       {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
                     </div>
                   </div>

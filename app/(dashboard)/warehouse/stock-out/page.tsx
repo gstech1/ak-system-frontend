@@ -120,7 +120,7 @@ export default function StockOutPage() {
 
   const warehouseId =
     process.env.NEXT_PUBLIC_MTK_WAREHOUSE_ID ||
-    "";
+    "03398d3f-a459-42b4-9f89-f85bd524701c";
 
   async function loadHistory() {
     try {
@@ -401,12 +401,21 @@ export default function StockOutPage() {
       return;
     }
 
-    const createdById =
-      typeof window !== "undefined"
-        ? localStorage.getItem("userId") ||
-          localStorage.getItem("authUserId") ||
-          ""
-        : "";
+    let createdById = "";
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "null");
+      createdById =
+        authUser?.id ||
+        authUser?.userId ||
+        localStorage.getItem("userId") ||
+        localStorage.getItem("authUserId") ||
+        "";
+    } catch {
+      createdById =
+        localStorage.getItem("userId") ||
+        localStorage.getItem("authUserId") ||
+        "";
+    }
 
     if (!createdById) {
       setErrorMessage(

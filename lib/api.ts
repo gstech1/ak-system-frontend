@@ -656,6 +656,126 @@ export async function createSerialBulk(
 
   return await response.json();
 }
+
+/* ======================================================
+   MTK BARCODE PRINTING
+   ====================================================== */
+
+export interface BarcodePrintBatch {
+  id: string;
+  prefix: string;
+  startNumber: number;
+  endNumber: number;
+  numberWidth: number;
+  startCode: string;
+  endCode: string;
+  layout: string;
+  kind: "NORMAL" | "SKIP" | "REPRINT";
+  createdById: string;
+  createdAt: string;
+}
+
+export interface BarcodeAuthorizationRequest {
+  id: string;
+  action: "SKIP" | "REPRINT";
+  prefix: string;
+  startNumber: number;
+  quantity: number;
+  numberWidth: number;
+  startCode: string;
+  endCode: string;
+  layout: string;
+  reason: string;
+  expectedNextNumber: number | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  requestedById: string;
+  decidedById: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+};
+
+export interface BarcodePrintOverview {
+  configured: boolean;
+  configuration: null | {
+    prefix: string;
+    numberWidth: number;
+    nextCode: string;
+  };
+  batches: BarcodePrintBatch[];
+  requests: BarcodeAuthorizationRequest[];
+}
+
+export interface BarcodePrintJob {
+  batchId: string;
+  prefix: string;
+  startNumber: number;
+  endNumber: number;
+  numberWidth: number;
+  layout: string;
+  kind: "NORMAL" | "SKIP" | "REPRINT";
+  codes: string[];
+}
+
+async function barcodePrintRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/barcode-print${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+      ...init?.headers,
+    },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = Array.isArray(payload?.message)
+      ? payload.message.join(" ")
+      : payload?.message;
+    throw new Error(message || "Barcode request failed.");
+  }
+  return payload as T;
+}
+
+export function getBarcodePrintOverview() {
+  return barcodePrintRequest<BarcodePrintOverview>("");
+}
+
+export function configureBarcodeSequence(firstCode: string) {
+  return barcodePrintRequest<{ configured: boolean; nextCode: string }>("/configuration", {
+    method: "POST",
+    body: JSON.stringify({ firstCode }),
+  });
+}
+
+export function generateBarcodeLabels(quantity: number, layout: string) {
+  return barcodePrintRequest<BarcodePrintJob>("/generate", {
+    method: "POST",
+    body: JSON.stringify({ quantity, layout }),
+  });
+}
+
+export function requestBarcodeAuthorization(input: {
+  action: "SKIP" | "REPRINT";
+  startCode: string;
+  quantity: number;
+  layout: string;
+  reason: string;
+}) {
+  return barcodePrintRequest<BarcodeAuthorizationRequest>("/authorization-requests", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function decideBarcodeAuthorization(id: string, decision: "APPROVE" | "REJECT") {
+  return barcodePrintRequest<{
+    request: BarcodeAuthorizationRequest;
+    batch?: BarcodePrintJob & { startCode: string; endCode: string };
+  }>(`/authorization-requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ decision }),
+  });
+}
 /* ======================================================
    SERIAL REJECT
    ====================================================== */
