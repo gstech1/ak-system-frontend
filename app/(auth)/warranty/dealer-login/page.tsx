@@ -319,6 +319,21 @@ export default function DealerLoginPage() {
                 : "DEALER SIGN IN"}
             </button>
 
+            {/* Password help */}
+            <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
+              <p className="text-xs text-slate-600">
+                Forgot your password?
+              </p>
+              <a
+                href="https://suntreemyanmar.com/#contact"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex h-11 w-full items-center justify-center rounded-xl border border-emerald-200 bg-white text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              >
+                Contact Us for Help
+              </a>
+            </div>
+
             {/* Dealer Access Information */}
             <div className="mt-5 rounded-xl bg-slate-50 px-4 py-4 text-center">
 
