@@ -459,13 +459,13 @@ export default function DealerLoginPage() {
             </div>
 
             {/* Back to Public Warranty Check */}
-            <Link
-              href="/warranty/public"
+            <a
+              href="https://suntreemyanmar.com/warranty"
               className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800"
             >
               <ArrowLeft size={17} />
               Back to Warranty Check
-            </Link>
+            </a>
 
           </form>
         </div>
