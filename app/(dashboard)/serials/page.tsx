@@ -78,7 +78,11 @@ function earlierDate(first: string | null, second: string | null) {
 function getSerialWarrantyDates(serial: Serial, product?: Product | null) {
   const code = (product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "").toUpperCase();
   const months = product?.warrantyPolicyMonths ?? product?.warrantyPolicy?.warrantyMonths ?? product?.warrantyMonths ?? 12;
-  const purchaseDate = serial.shippedAt ?? serial.shipmentItem?.shipment?.shipmentDate ?? null;
+  const shipmentIsComplete =
+    serial.status === "SHIPPED" || serial.status === "REGISTERED";
+  const purchaseDate =
+    serial.shippedAt ??
+    (shipmentIsComplete ? serial.shipmentItem?.shipment?.shipmentDate ?? null : null);
 
   if (code === "A") {
     return { start: purchaseDate, end: addMonths(purchaseDate, months) };

@@ -51,7 +51,10 @@ function getWarrantyDates(
 ) {
   const policyCode = (product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "").toUpperCase();
   const months = product?.warrantyPolicyMonths ?? product?.warrantyPolicy?.warrantyMonths ?? product?.warrantyMonths ?? 12;
-  const purchaseDate = serial.shippedAt ?? shipmentDate;
+  const shipmentIsComplete =
+    serial.status === "SHIPPED" || serial.status === "REGISTERED";
+  const purchaseDate =
+    serial.shippedAt ?? (shipmentIsComplete ? shipmentDate : null);
 
   if (policyCode === "A") {
     return { start: purchaseDate, end: addMonths(purchaseDate, months) };
