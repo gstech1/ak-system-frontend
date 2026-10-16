@@ -198,22 +198,22 @@ export default function DealerLoginPage() {
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-4 sm:gap-7">
+          <div className="ml-auto flex items-center gap-3 sm:gap-5">
             <Image
               src="/images/logo/suntree-logo.png"
               alt="Suntree Myanmar"
               width={220}
-              height={86}
+              height={90}
               priority
-              className="h-14 w-36 object-contain sm:h-[72px] sm:w-[190px] lg:w-[220px]"
+              className="h-14 w-[150px] object-contain sm:h-[82px] sm:w-[210px] lg:w-[220px]"
             />
             <Image
               src="/images/logo/suntree-charger-myanmar.png"
               alt="Suntree Charger Myanmar"
-              width={200}
-              height={100}
+              width={220}
+              height={90}
               priority
-              className="h-14 w-[115px] object-contain sm:h-[72px] sm:w-[150px] lg:w-[180px]"
+              className="h-14 w-[150px] object-contain sm:h-[82px] sm:w-[210px] lg:w-[220px]"
             />
             <a
               href="https://suntreemyanmar.com"
