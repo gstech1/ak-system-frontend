@@ -174,41 +174,47 @@ export default function DealerLoginPage() {
         <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl">
+      <div className="relative z-10 mx-auto w-full max-w-[1440px]">
 
-        {/* Company branding */}
-        <div className="mb-6 rounded-2xl border border-white/40 bg-white/95 px-5 py-3 shadow-xl backdrop-blur">
-          <div className="flex items-center justify-center gap-4">
+        {/* Large company header, without the public site's navigation menu */}
+        <header className="mb-8 flex min-h-24 flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/50 bg-white/95 px-5 py-4 shadow-xl backdrop-blur sm:px-8 lg:px-10">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+            <Image
+              src="/images/logo/ak-logo2.png"
+              alt="Arkar Min Thuka logo"
+              width={120}
+              height={86}
+              priority
+              className="h-[68px] w-[90px] shrink-0 object-contain sm:h-[78px] sm:w-[112px]"
+            />
+            <div className="hidden h-14 w-px bg-slate-200 sm:block" />
+            <div className="min-w-0">
+              <p className="text-lg font-extrabold leading-tight tracking-wide text-slate-900 sm:text-2xl lg:text-3xl">
+                ARKAR MIN THU KHA
+              </p>
+              <p className="mt-1 text-sm text-slate-500 sm:text-base lg:text-lg">
+                Electro Trading Co., Ltd.
+              </p>
+            </div>
+          </div>
+
+          <div className="ml-auto flex items-center gap-4 sm:gap-7">
             <Image
               src="/images/logo/suntree-logo.png"
               alt="Suntree Myanmar"
-              width={150}
-              height={62}
+              width={220}
+              height={86}
               priority
-              className="h-12 w-32 object-contain"
+              className="h-14 w-36 object-contain sm:h-[72px] sm:w-[190px] lg:w-[220px]"
             />
-            <div className="h-10 w-px bg-slate-200" />
-            <Image
-              src="/images/logo/ak-logo2.png"
-              alt="Arkar Min Thuka Electro Trading Co., Ltd."
-              width={110}
-              height={58}
-              priority
-              className="h-12 w-24 object-contain"
-            />
+            <a
+              href="https://suntreemyanmar.com"
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 sm:h-12 sm:px-7 sm:text-base"
+            >
+              Home Page
+            </a>
           </div>
-          <p className="mt-2 text-center text-[11px] font-semibold text-slate-600">
-            Arkar Min Thuka Electro Trading Co., Ltd.
-          </p>
-        </div>
-
-        <a
-          href="https://suntreemyanmar.com"
-          className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/35 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-slate-950/55"
-        >
-          <ArrowLeft size={16} />
-          ပင်မစာမျက်နှာသို့ ပြန်သွားရန်
-        </a>
+        </header>
 
         <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(390px,0.9fr)] lg:gap-12">
           {/* Dealer partnership information */}
