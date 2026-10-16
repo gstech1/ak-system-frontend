@@ -207,6 +207,14 @@ export default function DealerLoginPage() {
               priority
               className="h-14 w-36 object-contain sm:h-[72px] sm:w-[190px] lg:w-[220px]"
             />
+            <Image
+              src="/images/logo/suntree-charger-myanmar.png"
+              alt="Suntree Charger Myanmar"
+              width={200}
+              height={100}
+              priority
+              className="h-14 w-[115px] object-contain sm:h-[72px] sm:w-[150px] lg:w-[180px]"
+            />
             <a
               href="https://suntreemyanmar.com"
               className="inline-flex h-11 items-center justify-center rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 sm:h-12 sm:px-7 sm:text-base"
