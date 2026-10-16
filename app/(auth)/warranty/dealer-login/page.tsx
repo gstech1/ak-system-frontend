@@ -202,17 +202,25 @@ export default function DealerLoginPage() {
           </p>
         </div>
 
+        <a
+          href="https://suntreemyanmar.com"
+          className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/35 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-slate-950/55"
+        >
+          <ArrowLeft size={16} />
+          ပင်မစာမျက်နှာသို့ ပြန်သွားရန်
+        </a>
+
         <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(390px,0.9fr)] lg:gap-12">
           {/* Dealer partnership information */}
           <section className="order-2 rounded-3xl border border-white/20 bg-slate-950/45 p-6 text-white shadow-2xl backdrop-blur-md sm:p-8 lg:order-1">
-            <p className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-400/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">
-              Suntree Myanmar Dealer Partnership
+            <p className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-400/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-200">
+              Dealer အခွင့်အလမ်းများ
             </p>
-            <h2 className="mt-5 text-2xl font-extrabold leading-snug sm:text-3xl">
-              Suntree Myanmar နဲ့ Dealer အဖြစ် လက်တွဲပါ
+            <h2 className="mt-4 text-xl font-extrabold leading-snug sm:text-2xl">
+              Suntree Myanmar Dealer အခွင့်အလမ်း
             </h2>
-            <p className="mt-4 text-sm leading-7 text-slate-100 sm:text-base">
-              Suntree Myanmar ကို တရုတ်နိုင်ငံရှိ Suntree လုပ်ငန်းစုမှ မြန်မာနိုင်ငံအတွက် တရားဝင်{" "}
+            <p className="mt-3 text-sm leading-6 text-slate-100">
+              တရုတ်နိုင်ငံရှိ Suntree လုပ်ငန်းစုက မြန်မာနိုင်ငံအတွက် Arkar Min Thuka Electro Trading Co., Ltd. ကို တရားဝင်{" "}
               <a
                 href="https://suntreemyanmar.com/about/authorized-distributor"
                 target="_blank"
@@ -221,43 +229,43 @@ export default function DealerLoginPage() {
               >
                 Authorized Distributor
               </a>
-              {" "}အဖြစ် ခန့်အပ်ထားသော Arkar Min Thuka Electro Trading Co., Ltd. ဖြစ်ပါတယ်။
+              {" "}အဖြစ် ခန့်အပ်ထားပါတယ်။
             </p>
 
-            <ul className="mt-6 space-y-4">
-              <li className="flex gap-3 text-sm leading-6 text-slate-100 sm:text-base">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
-                <span>မူရင်း Suntree ပစ္စည်းများကို မိတ်ဆက်ရောင်းချနိုင်မယ့် အခွင့်အလမ်း</span>
+            <ul className="mt-5 space-y-3">
+              <li className="flex gap-3 text-sm leading-5 text-slate-100">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>မူရင်း Suntree ပစ္စည်းများကို မိတ်ဆက်ရောင်းချနိုင်ခြင်း</span>
               </li>
-              <li className="flex gap-3 text-sm leading-6 text-slate-100 sm:text-base">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
-                <span>မူလစက်ရုံမှပေးထားသော အာမခံအပြင် Suntree Myanmar မှလည်း ထပ်တိုးအာမခံ ရရှိနိုင်မှု</span>
+              <li className="flex gap-3 text-sm leading-5 text-slate-100">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>စက်ရုံအာမခံအပြင် Suntree Myanmar မှ ထပ်တိုးအာမခံ ရရှိနိုင်ခြင်း</span>
               </li>
-              <li className="flex gap-3 text-sm leading-6 text-slate-100 sm:text-base">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
-                <span>Dealer Portal မှ warranty ကို စစ်ဆေးနိုင်ခြင်း၊ ဆိုင်ရှင်များကိုယ်တိုင် မှတ်ပုံတင်နိုင်ခြင်း</span>
+              <li className="flex gap-3 text-sm leading-5 text-slate-100">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>Dealer Portal မှ warranty စစ်ဆေးနိုင်ပြီး ဆိုင်ရှင်များကိုယ်တိုင် မှတ်ပုံတင်နိုင်ခြင်း</span>
               </li>
-              <li className="flex gap-3 text-sm leading-6 text-slate-100 sm:text-base">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
-                <span>Warranty အစားထိုး/ဝန်ဆောင်မှုများကို ငြင်းခုန်စရာမလိုဘဲ တိုက်ရိုက်တောင်းဆိုပြီး အာမခံဖြင့် လဲလှယ်ဆောင်ရွက်နိုင်ခြင်း</span>
+              <li className="flex gap-3 text-sm leading-5 text-slate-100">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>Warranty အစားထိုး/ဝန်ဆောင်မှုများကို တိုက်ရိုက်တောင်းဆိုပြီး အာမခံဖြင့် လဲလှယ်နိုင်ခြင်း</span>
               </li>
-              <li className="flex gap-3 text-sm leading-6 text-slate-100 sm:text-base">
-                <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
-                <span>Dealer ကိုယ်တိုင် အချက်အလက်နှင့် ဝန်ဆောင်မှုမှတ်တမ်းများကို အချိန်နှင့်တစ်ပြေးညီ စီမံနိုင်ခြင်း</span>
+              <li className="flex gap-3 text-sm leading-5 text-slate-100">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>Dealer အချက်အလက်နှင့် ဝန်ဆောင်မှုမှတ်တမ်းများကို အချိန်နှင့်တစ်ပြေးညီ စီမံနိုင်ခြင်း</span>
               </li>
             </ul>
 
-            <p className="mt-7 text-sm font-semibold leading-6 text-white sm:text-base">
-              Dealer အဖြစ် ပါဝင်ဖို့ စိတ်ဝင်စားပါသလား?
+            <p className="mt-6 text-sm font-semibold leading-6 text-white">
+              Dealer အဖြစ် ပါဝင်ဖို့ စိတ်ဝင်စားပါသလား?{" "}
+              <a
+                href="https://suntreemyanmar.com/#contact"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-emerald-200 underline decoration-emerald-300/70 underline-offset-4 hover:text-white"
+              >
+                ကျွန်ုပ်တို့ထံ ဆက်သွယ်ပါ
+              </a>
             </p>
-            <a
-              href="https://suntreemyanmar.com/#contact"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-emerald-400"
-            >
-              ကျွန်ုပ်တို့ထံ ဆက်သွယ်ပါ
-            </a>
           </section>
 
           <div className="order-1 mx-auto w-full max-w-md lg:order-2">
@@ -419,19 +427,16 @@ export default function DealerLoginPage() {
             </button>
 
             {/* Password help */}
-            <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
-              <p className="text-xs text-slate-600">
-                Password မေ့နေပါသလား?
-              </p>
+            <p className="mt-4 text-center text-sm">
               <a
                 href="https://suntreemyanmar.com/#contact"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 flex h-11 w-full items-center justify-center rounded-xl border border-emerald-200 bg-white text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                className="font-semibold text-emerald-700 underline underline-offset-4 hover:text-emerald-900"
               >
-                ကျွန်ုပ်တို့ထံ ဆက်သွယ်ပါ
+                Password မေ့နေပါသလား?
               </a>
-            </div>
+            </p>
 
             {/* Dealer Access Information */}
             <div className="mt-5 rounded-xl bg-slate-50 px-4 py-4 text-center">
