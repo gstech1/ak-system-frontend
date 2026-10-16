@@ -27,9 +27,25 @@ type ActionItem = {
   href: string;
 };
 
+type MtkSummary = {
+  warehouse: string | null;
+  products: { total: number };
+  stock: { quantity: number };
+  stockIn: { transactions: number; quantity: number };
+  salesOut: { transactions: number; quantity: number };
+  serviceIssue: { transactions: number; issuedQuantity: number; outstandingQuantity: number };
+  serviceReturn: { records: number; returnedQuantity: number; usedQuantity: number };
+};
+
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
+).replace(/\/+$/, "");
+
 export default function WarehousePage() {
   const [authUser, setAuthUser] =
     useState<AuthUser | null>(null);
+  const [summary, setSummary] = useState<MtkSummary | null>(null);
+  const [summaryError, setSummaryError] = useState("");
 
   useEffect(() => {
     try {
@@ -49,6 +65,25 @@ export default function WarehousePage() {
         error,
       );
     }
+  }, []);
+
+  useEffect(() => {
+    async function loadSummary() {
+      try {
+        const accessToken = localStorage.getItem("accessToken");
+        if (!accessToken) return;
+        const response = await fetch(`${API_BASE_URL}/dashboard/mtk-summary`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.message || "Unable to load MTK stock summary.");
+        setSummary(data);
+      } catch (error) {
+        setSummaryError(error instanceof Error ? error.message : "Unable to load MTK stock summary.");
+      }
+    }
+    loadSummary();
   }, []);
 
   const role = String(
@@ -233,6 +268,42 @@ export default function WarehousePage() {
             </div>
           </div>
         </header>
+
+        <section className="mb-8">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">MTK Stock Overview</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {summary?.warehouse ? `${summary.warehouse} · MTK warehouse data` : "Live stock and movement totals"}
+              </p>
+            </div>
+            <button type="button" onClick={() => goTo("/warehouse/reports")} className="text-sm font-bold text-emerald-700 hover:text-emerald-800">
+              View reports →
+            </button>
+          </div>
+          {summaryError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{summaryError}</div>
+          ) : !summary ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">Loading MTK stock summary…</div>
+          ) : !summary.warehouse ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">MTK-MAIN warehouse is not configured. Ask an administrator to check the warehouse setup.</div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["Current Stock", summary.stock.quantity, "units in warehouse"],
+                ["Stock IN", summary.stockIn.quantity, `${summary.stockIn.transactions} receipts`],
+                ["Sales OUT", summary.salesOut.quantity, `${summary.salesOut.transactions} completed issues`],
+                ["Service Outstanding", summary.serviceIssue.outstandingQuantity, `${summary.serviceIssue.transactions} service issues`],
+              ].map(([label, amount, detail]) => (
+                <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-semibold text-slate-500">{label}</p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">{amount}</p>
+                  <p className="mt-1 text-xs text-slate-400">{detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* ======================================================
             NEW SALE

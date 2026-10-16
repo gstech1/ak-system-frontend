@@ -10,28 +10,13 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 type DashboardSummary = {
-  products?: {
-    total?: number;
-  };
-  serials?: {
-    total?: number;
-    inStock?: number;
-    shipped?: number;
-    rejectPending?: number;
-    rejected?: number;
-  };
-  dealers?: {
-    total?: number;
-  };
-  shipments?: {
-    total?: number;
-  };
-  warranty?: {
-    active?: number;
-  };
-  returns?: {
-    pending?: number;
-  };
+  warehouse: string | null;
+  products: { total: number };
+  stock: { quantity: number };
+  stockIn: { transactions: number; quantity: number };
+  salesOut: { transactions: number; quantity: number };
+  serviceIssue: { transactions: number; issuedQuantity: number; outstandingQuantity: number };
+  serviceReturn: { records: number; returnedQuantity: number; usedQuantity: number };
 };
 
 type ReportCardProps = {
@@ -85,7 +70,7 @@ export default function ReportsPage() {
         }
 
         const response = await fetch(
-          `${API_BASE_URL}/dashboard/summary`,
+          `${API_BASE_URL}/dashboard/mtk-summary`,
           {
             method: "GET",
             headers: {
@@ -124,24 +109,6 @@ export default function ReportsPage() {
     loadReports();
   }, []);
 
-  const productsTotal =
-    summary?.products?.total ?? 0;
-
-  const stockTotal =
-    summary?.serials?.inStock ?? 0;
-
-  const salesOut =
-    summary?.serials?.shipped ?? 0;
-
-  const serviceIssue =
-    summary?.serials?.rejectPending ?? 0;
-
-  const serviceReturn =
-    summary?.returns?.pending ?? 0;
-
-  const stockCount =
-    summary?.serials?.total ?? 0;
-
   return (
     <MTKSolarShell>
       <div className="min-h-screen bg-slate-50">
@@ -156,6 +123,12 @@ export default function ReportsPage() {
               Warehouse reports and stock information
             </p>
           </header>
+
+          {!loading && !error && !summary?.warehouse && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-800">
+              MTK-MAIN warehouse is not configured. Ask an administrator to check the warehouse setup.
+            </div>
+          )}
 
           {loading && (
             <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500 shadow-sm">
@@ -172,63 +145,39 @@ export default function ReportsPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
             <ReportCard
-              title="Stock Summary"
-              value={
-                loading
-                  ? "..."
-                  : stockTotal
-              }
-              description="Current warehouse stock"
+              title="Current Stock"
+              value={loading ? "..." : summary?.stock.quantity ?? 0}
+              description="Units currently in MTK-MAIN"
             />
 
             <ReportCard
               title="Stock IN"
-              value={
-                loading
-                  ? "..."
-                  : productsTotal
-              }
-              description="Registered products"
+              value={loading ? "..." : summary?.stockIn.quantity ?? 0}
+              description={`${summary?.stockIn.transactions ?? 0} completed receipt(s) · total units received`}
             />
 
             <ReportCard
               title="Sales OUT"
-              value={
-                loading
-                  ? "..."
-                  : salesOut
-              }
-              description="Shipped serials"
+              value={loading ? "..." : summary?.salesOut.quantity ?? 0}
+              description={`${summary?.salesOut.transactions ?? 0} completed issue(s) · total units sent out`}
             />
 
             <ReportCard
               title="Service Issue"
-              value={
-                loading
-                  ? "..."
-                  : serviceIssue
-              }
-              description="Pending reject items"
+              value={loading ? "..." : summary?.serviceIssue.outstandingQuantity ?? 0}
+              description={`${summary?.serviceIssue.transactions ?? 0} completed issue(s) · units not yet returned or used`}
             />
 
             <ReportCard
               title="Service Return"
-              value={
-                loading
-                  ? "..."
-                  : serviceReturn
-              }
-              description="Pending returns"
+              value={loading ? "..." : summary?.serviceReturn.returnedQuantity ?? 0}
+              description={`${summary?.serviceReturn.records ?? 0} processed line(s) · returned units (used: ${summary?.serviceReturn.usedQuantity ?? 0})`}
             />
 
             <ReportCard
-              title="Stock Count"
-              value={
-                loading
-                  ? "..."
-                  : stockCount
-              }
-              description="Total registered serials"
+              title="Product Types"
+              value={loading ? "..." : summary?.products.total ?? 0}
+              description="Active MTK products"
             />
 
           </div>
