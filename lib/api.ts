@@ -1299,6 +1299,27 @@ export async function deleteShipment(
   return await response.json();
 }
 
+export async function confirmDraftShipment(
+  id: string,
+): Promise<Shipment> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${id}/confirm`,
+    {
+      method: "POST",
+      headers: { ...getAuthHeaders() },
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      errorData?.message || "Unable to confirm shipment.",
+    );
+  }
+
+  return await response.json();
+}
+
 export async function addShipmentItem(
   shipmentId: string,
   data: CreateShipmentItemInput,

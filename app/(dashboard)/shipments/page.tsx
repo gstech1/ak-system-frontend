@@ -13,6 +13,7 @@ import { Printer } from "lucide-react";
 
 import {
   createShipmentWithSerials,
+  confirmDraftShipment,
   deleteShipment,
   getShipments,
   getSerialByNumber,
@@ -78,6 +79,12 @@ export default function ShipmentsPage() {
   const [deleting, setDeleting] =
     useState("");
 
+  const [confirming, setConfirming] =
+    useState("");
+
+  const [canConfirmShipments, setCanConfirmShipments] =
+    useState(false);
+
   const [isAdmin, setIsAdmin] =
     useState(false);
 
@@ -135,8 +142,12 @@ export default function ShipmentsPage() {
           localStorage.getItem("authUser") ?? "null",
         );
         setIsAdmin(authUser?.role === "ADMIN");
+        setCanConfirmShipments(
+          ["ADMIN", "MANAGER", "WAREHOUSE"].includes(authUser?.role),
+        );
       } catch {
         setIsAdmin(false);
+        setCanConfirmShipments(false);
       }
 
       if (!token) {
@@ -487,6 +498,31 @@ export default function ShipmentsPage() {
       );
     } finally {
       setDeleting("");
+    }
+  }
+
+  async function handleConfirmShipment(shipment: Shipment) {
+    const dealerName = getDealerName(shipment.dealerId);
+    const confirmed = window.confirm(
+      `Confirm shipment ${shipment.shipmentNo} to ${dealerName}? Its serials will be marked as shipped and added to the dealer's stock.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setConfirming(shipment.id);
+      setError("");
+      setSuccess("");
+      await confirmDraftShipment(shipment.id);
+      setSuccess(
+        `Shipment ${shipment.shipmentNo} is confirmed. Its items are now recorded as shipped to ${dealerName}.`,
+      );
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to confirm shipment.",
+      );
+    } finally {
+      setConfirming("");
     }
   }
 
@@ -980,6 +1016,16 @@ export default function ShipmentsPage() {
                           >
                             View
                           </Link>
+                          {shipment.status === "DRAFT" && canConfirmShipments && (
+                            <button
+                              type="button"
+                              onClick={() => void handleConfirmShipment(shipment)}
+                              disabled={confirming === shipment.id}
+                              className="mr-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {confirming === shipment.id ? "Confirming..." : "Confirm"}
+                            </button>
+                          )}
                           {(shipment.status ===
                             "DRAFT" || isAdmin) && (
                             <button
