@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { PackageSearch } from 'lucide-react';
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 
@@ -29,6 +30,32 @@ type Dealer = {
 type DealerDetails = Dealer & {
   loginUsername?: string | null;
   loginStatus?: 'ACTIVE' | 'INACTIVE' | null;
+};
+
+type DealerStockUnit = {
+  serialNumber: string;
+  serialStatus: string;
+  productCode: string | null;
+  productName: string | null;
+  modelCode: string | null;
+  warrantyPolicyCode: string | null;
+  replacementForSerialNumber: string | null;
+  shipmentNo: string | null;
+  warranty: null | {
+    status: string;
+    warrantyStart: string | null;
+    warrantyEnd: string | null;
+  };
+};
+
+type DealerStockOverview = {
+  summary: {
+    stockCount: number;
+    activeWarrantyCount: number;
+    expiringSoonCount: number;
+    replacementCount: number;
+  };
+  units: DealerStockUnit[];
 };
 
 type DealerForm = {
@@ -100,6 +127,24 @@ export default function DealersPage() {
   const [actionLoading, setActionLoading] =
     useState(false);
 
+  const [canViewDealerStock, setCanViewDealerStock] =
+    useState(false);
+
+  const [showStockInfo, setShowStockInfo] =
+    useState(false);
+
+  const [stockDealer, setStockDealer] =
+    useState<Dealer | null>(null);
+
+  const [stockOverview, setStockOverview] =
+    useState<DealerStockOverview | null>(null);
+
+  const [stockLoading, setStockLoading] =
+    useState(false);
+
+  const [stockError, setStockError] =
+    useState('');
+
   async function loadDealers() {
     try {
       setLoading(true);
@@ -147,6 +192,24 @@ export default function DealersPage() {
 
   useEffect(() => {
     loadDealers();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('authUser');
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      const allowedRoles = ['ADMIN', 'BOSS', 'MANAGER', 'SALES'];
+      // Access is restored from the browser session after mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCanViewDealerStock(
+        user?.role === 'ADMIN' ||
+          (allowedRoles.includes(user?.role) &&
+            user?.permissions?.includes('DEALERS_VIEW')),
+      );
+    } catch {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCanViewDealerStock(false);
+    }
   }, []);
 
   function updateField(
@@ -267,6 +330,39 @@ export default function DealersPage() {
       );
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function openStockInfo(dealer: Dealer) {
+    setStockDealer(dealer);
+    setStockOverview(null);
+    setStockError('');
+    setStockLoading(true);
+    setShowStockInfo(true);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) throw new Error('Login session not found. Please login again.');
+
+      const response = await fetch(
+        `${API_BASE_URL}/dealers/${dealer.id}/stock-info`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Unable to load dealer stock information.');
+      }
+
+      setStockOverview(data);
+    } catch (err) {
+      setStockError(
+        err instanceof Error ? err.message : 'Unable to load dealer stock information.',
+      );
+    } finally {
+      setStockLoading(false);
     }
   }
 
@@ -764,6 +860,18 @@ return (
                     View
                   </button>
 
+                  {canViewDealerStock && (
+                    <button
+                      type="button"
+                      onClick={() => void openStockInfo(dealer)}
+                      disabled={stockLoading}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      <PackageSearch size={14} />
+                      Stock Info
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={async () => {
@@ -1024,6 +1132,110 @@ return (
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* =====================================================
+          DEALER STOCK INFO MODAL
+      ===================================================== */}
+
+      {showStockInfo && stockDealer && (
+        <Modal
+          title={`${stockDealer.companyName} · Stock Info`}
+          subtitle={`${stockDealer.dealerCode} · Dealer stock and warranty status`}
+          onClose={() => {
+            setShowStockInfo(false);
+            setStockDealer(null);
+          }}
+        >
+          {stockLoading ? (
+            <div className="py-12 text-center text-sm text-slate-500">
+              Loading dealer stock...
+            </div>
+          ) : stockError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {stockError}
+            </div>
+          ) : stockOverview ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StockSummary label="Dealer stock" value={stockOverview.summary.stockCount} />
+                <StockSummary label="Active warranty" value={stockOverview.summary.activeWarrantyCount} />
+                <StockSummary label="Expiring soon" value={stockOverview.summary.expiringSoonCount} />
+                <StockSummary label="Replacements" value={stockOverview.summary.replacementCount} />
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-bold text-slate-800">Dealer items</h3>
+                  <span className="text-xs text-slate-500">
+                    {stockOverview.units.length} serial(s)
+                  </span>
+                </div>
+                {stockOverview.units.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+                    No dealer stock records found.
+                  </div>
+                ) : (
+                  <div className="max-h-[50vh] overflow-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-left text-xs">
+                      <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                        <tr>
+                          <th className="px-3 py-3 font-semibold">Product</th>
+                          <th className="px-3 py-3 font-semibold">Serial</th>
+                          <th className="px-3 py-3 font-semibold">Status</th>
+                          <th className="px-3 py-3 font-semibold">Warranty</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {stockOverview.units.map((unit) => {
+                          const isStock = !unit.replacementForSerialNumber && (
+                            unit.serialStatus === 'SHIPPED' ||
+                            ((unit.warrantyPolicyCode === 'B' || unit.warrantyPolicyCode === 'C') &&
+                              unit.serialStatus === 'REGISTERED')
+                          );
+                          const statusLabel = unit.replacementForSerialNumber
+                            ? 'Replacement issued'
+                            : isStock
+                              ? 'In dealer stock'
+                              : unit.serialStatus.replaceAll('_', ' ');
+
+                          return (
+                            <tr key={unit.serialNumber}>
+                              <td className="px-3 py-3">
+                                <p className="font-semibold text-slate-800">
+                                  {unit.productName || unit.productCode || '—'}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                  {[unit.productCode, unit.modelCode].filter(Boolean).join(' · ') || '—'}
+                                </p>
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 font-mono font-semibold text-slate-700">
+                                {unit.serialNumber}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${isStock ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                  {statusLabel}
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                                {unit.warranty?.status || 'Not registered'}
+                                {unit.warranty?.warrantyEnd && (
+                                  <p className="mt-0.5 text-[10px] text-slate-400">
+                                    Ends {new Date(unit.warranty.warrantyEnd).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
         </Modal>
       )}
 
@@ -1603,5 +1815,14 @@ function StatusBadge({
     >
       {status}
     </span>
+  );
+}
+
+function StockSummary({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800">
+      <p className="text-[11px] font-semibold leading-4">{label}</p>
+      <p className="mt-1 text-2xl font-extrabold leading-none">{value}</p>
+    </div>
   );
 }
