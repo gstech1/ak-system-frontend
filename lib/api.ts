@@ -740,6 +740,13 @@ export function getBarcodePrintOverview() {
   return barcodePrintRequest<BarcodePrintOverview>("");
 }
 
+export function deleteBarcodePrintBatch(id: string) {
+  return barcodePrintRequest<{ success: boolean; deletedBatchId: string }>(
+    `/batches/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function configureBarcodeSequence(firstCode: string) {
   return barcodePrintRequest<{ configured: boolean; nextCode: string }>("/configuration", {
     method: "POST",

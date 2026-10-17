@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Barcode, Check, Clock3, Printer, Settings2, SlidersHorizontal } from "lucide-react";
+import { AlertCircle, Barcode, Check, Clock3, Printer, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 import {
   configureBarcodeSequence,
+  deleteBarcodePrintBatch,
   decideBarcodeAuthorization,
   generateBarcodeLabels,
   getBarcodePrintOverview,
   requestBarcodeAuthorization,
   type BarcodeAuthorizationRequest,
   type BarcodePrintJob,
+  type BarcodePrintBatch,
   type BarcodePrintOverview,
 } from "@/lib/api";
 
@@ -146,7 +148,9 @@ export default function BarcodePrintPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
   const canApprove = APPROVER_ROLES.has(role);
+  const isSuperAdmin = role === "ADMIN";
 
   const load = useCallback(async () => {
     setError("");
@@ -242,6 +246,22 @@ export default function BarcodePrintPage() {
     } finally { setBusy(false); }
   }
 
+  async function handleDeleteBatch(batch: BarcodePrintBatch) {
+    const confirmed = window.confirm(
+      `Delete print history for ${batch.startCode} — ${batch.endCode}? The reserved numbers will not be reused.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingBatchId(batch.id); setError(""); setNotice("");
+    try {
+      await deleteBarcodePrintBatch(batch.id);
+      setNotice("Barcode print history deleted. The reserved numbers will not be reused.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete barcode print history.");
+    } finally { setDeletingBatchId(null); }
+  }
+
   return (
     <DashboardShell>
       <div className="mx-auto max-w-6xl space-y-6">
@@ -281,7 +301,7 @@ export default function BarcodePrintPage() {
 
             {overview.requests.some((request) => request.status !== "PENDING") && <section className="rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-5"><h2 className="text-lg font-bold text-slate-900">Authorization history</h2><p className="text-sm text-slate-500">Approved and rejected skip/reprint requests.</p></div><div className="divide-y divide-slate-100">{overview.requests.filter((request) => request.status !== "PENDING").map((request) => <div key={request.id} className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${request.status === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>{request.status}</span><span className="text-xs font-bold text-slate-500">{request.action === "SKIP" ? "SKIP AHEAD" : "REPRINT"}</span><span className="font-mono text-sm text-slate-800">{request.startCode} — {request.endCode}</span></div><p className="mt-1 text-sm text-slate-600">Reason: {request.reason}</p>{request.action === "SKIP" && request.expectedNextNumber !== null && request.expectedNextNumber !== undefined && request.startNumber > request.expectedNextNumber && <p className="mt-1 text-xs text-amber-700">Skipped sequence: {fullCode(request.prefix, request.expectedNextNumber, request.numberWidth)} – {fullCode(request.prefix, request.startNumber - 1, request.numberWidth)}</p>}{request.decisionNote && <p className="mt-1 text-xs text-slate-500">Decision note: {request.decisionNote}</p>}</div><time className="shrink-0 text-xs text-slate-400">{request.decidedAt ? new Date(request.decidedAt).toLocaleString() : new Date(request.createdAt).toLocaleString()}</time></div>)}</div></section>}
 
-            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-5"><h2 className="text-lg font-bold text-slate-900">Barcode print history</h2><p className="text-sm text-slate-500">Latest 50 print batches. Reprinting a past range always requires authorization.</p></div>{overview.batches.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Type</th><th className="px-5 py-3">Barcode range</th><th className="px-5 py-3">Quantity</th><th className="px-5 py-3">Sticker size</th><th className="px-5 py-3">Created</th></tr></thead><tbody className="divide-y divide-slate-100">{overview.batches.map((batch) => <tr key={batch.id}><td className="px-5 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{batch.kind}</span></td><td className="px-5 py-3 font-mono text-slate-800">{batch.startCode} — {batch.endCode}</td><td className="px-5 py-3">{batch.endNumber - batch.startNumber + 1}</td><td className="px-5 py-3">{describeLayout(batch.layout)}</td><td className="px-5 py-3 text-slate-500">{new Date(batch.createdAt).toLocaleString()}</td></tr>)}</tbody></table></div> : <p className="p-6 text-sm text-slate-500">No barcodes have been printed yet.</p>}</section>
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-5"><h2 className="text-lg font-bold text-slate-900">Barcode print history</h2><p className="text-sm text-slate-500">Latest 50 print batches. Reprinting a past range always requires authorization.</p></div>{overview.batches.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Type</th><th className="px-5 py-3">Barcode range</th><th className="px-5 py-3">Quantity</th><th className="px-5 py-3">Sticker size</th><th className="px-5 py-3">Created</th>{isSuperAdmin && <th className="px-5 py-3">Action</th>}</tr></thead><tbody className="divide-y divide-slate-100">{overview.batches.map((batch) => <tr key={batch.id}><td className="px-5 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{batch.kind}</span></td><td className="px-5 py-3 font-mono text-slate-800">{batch.startCode} — {batch.endCode}</td><td className="px-5 py-3">{batch.endNumber - batch.startNumber + 1}</td><td className="px-5 py-3">{describeLayout(batch.layout)}</td><td className="px-5 py-3 text-slate-500">{new Date(batch.createdAt).toLocaleString()}</td>{isSuperAdmin && <td className="px-5 py-3"><button type="button" onClick={() => void handleDeleteBatch(batch)} disabled={deletingBatchId === batch.id} className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={14} />{deletingBatchId === batch.id ? "Deleting..." : "Delete"}</button></td>}</tr>)}</tbody></table></div> : <p className="p-6 text-sm text-slate-500">No barcodes have been printed yet.</p>}</section>
 
             <details className="rounded-2xl border border-slate-200 bg-white shadow-sm"><summary className="flex cursor-pointer list-none items-center gap-2 p-5 font-bold text-slate-900"><SlidersHorizontal size={18} className="text-slate-600" />Printer Settings <span className="ml-auto text-xs font-normal text-slate-500">Saved on this computer</span></summary><div className="border-t border-slate-100 p-5"><p className="mb-4 text-sm text-slate-600">Roll width is fixed at 4 inches (101.6 mm). Choose a sticker size; the number that fits across is calculated automatically.</p><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><div className="rounded-xl bg-slate-50 px-3 py-2.5"><p className="text-xs font-semibold text-slate-500">Fixed roll width</p><p className="mt-1 font-bold text-slate-800">4 inch · 101.6 mm</p></div><label className="text-sm font-semibold text-slate-700">Sticker preset<select value={sizePreset} onChange={(event) => { const preset = event.target.value; setSizePreset(preset); setSettingsSaved(false); if (preset === "32x25") setPrinterSettings((current) => ({ ...current, labelWidth: 32, labelHeight: 25 })); else if (preset === "2x1in") setPrinterSettings((current) => ({ ...current, labelWidth: 50.8, labelHeight: 25.4 })); else if (preset === "1x1in") setPrinterSettings((current) => ({ ...current, labelWidth: 25.4, labelHeight: 25.4 })); }} className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"><option value="32x25">32 × 25 mm</option><option value="2x1in">2 × 1 inch (50.8 × 25.4 mm)</option><option value="1x1in">1 × 1 inch (25.4 × 25.4 mm)</option><option value="custom">Custom size</option></select></label><div className="rounded-xl bg-slate-50 px-3 py-2.5"><p className="text-xs font-semibold text-slate-500">Labels across</p><p className="mt-1 font-bold text-slate-800">{getColumns(printerSettings)} per row</p></div><label className="text-sm font-semibold text-slate-700">Sticker width (mm)<input type="number" step="0.1" min="10" max="100" value={printerSettings.labelWidth} onChange={(event) => { setSizePreset("custom"); setSettingsSaved(false); setPrinterSettings((current) => ({ ...current, labelWidth: Number(event.target.value) })); }} className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-semibold text-slate-700">Sticker height (mm)<input type="number" step="0.1" min="8" max="100" value={printerSettings.labelHeight} onChange={(event) => { setSizePreset("custom"); setSettingsSaved(false); setPrinterSettings((current) => ({ ...current, labelHeight: Number(event.target.value) })); }} className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-semibold text-slate-700">Gap between stickers (mm)<input type="number" step="0.1" min="0" max="5" value={printerSettings.horizontalGap} onChange={(event) => { setSettingsSaved(false); setPrinterSettings((current) => ({ ...current, horizontalGap: Number(event.target.value) })); }} className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-semibold text-slate-700">Gap between rows (mm)<input type="number" step="0.1" min="0" max="10" value={printerSettings.verticalGap} onChange={(event) => { setSettingsSaved(false); setPrinterSettings((current) => ({ ...current, verticalGap: Number(event.target.value) })); }} className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5" /></label></div><div className="mt-4 flex flex-wrap items-center gap-3"><button onClick={() => { localStorage.setItem("mtkBarcodePrinterSettings", JSON.stringify(printerSettings)); setSettingsSaved(true); }} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Save printer settings</button><button onClick={() => { setPrinterSettings(DEFAULT_PRINTER_SETTINGS); setSizePreset("32x25"); localStorage.removeItem("mtkBarcodePrinterSettings"); setSettingsSaved(true); }} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Reset sticker size</button>{settingsSaved && <span role="status" className="text-sm font-medium text-emerald-700">Settings saved for this computer.</span>}</div><p className="mt-3 text-xs text-slate-500">Choose 2 × 1 inch or 1 × 1 inch when you change sticker rolls; the 4-inch backing stays fixed. Settings are saved in this browser and can be changed later.</p></div></details>
             <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600"><strong>Code 39 barcode labels.</strong> Choose the TSC sticker printer in the browser print dialog and confirm its media width and gap calibration match these settings. Skips and reprints require approval and are recorded.</section>
