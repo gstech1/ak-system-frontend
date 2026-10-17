@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
 
 const API_URL = (
@@ -40,12 +41,19 @@ type OtherProduct = {
   stockBalances: WarehouseStock[];
 };
 
+type AuthUser = {
+  role?: string;
+};
+
 export default function ProductListPage() {
   const [products, setProducts] = useState<OtherProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   async function loadProducts() {
     try {
@@ -78,8 +86,67 @@ export default function ProductListPage() {
   }
 
   useEffect(() => {
+    try {
+      const authUser = localStorage.getItem("authUser");
+      if (authUser) {
+        const parsedUser = JSON.parse(authUser) as AuthUser;
+        setIsAdmin(String(parsedUser.role || "").toUpperCase() === "ADMIN");
+      }
+    } catch {
+      setIsAdmin(false);
+    }
+
     loadProducts();
   }, []);
+
+  async function deleteProduct(product: OtherProduct) {
+    const shouldDelete = window.confirm(
+      `Delete ${product.productName} (${product.productCode}) from the active Product List? Stock IN history will be kept.`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      setDeletingProductId(product.id);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) {
+        throw new Error("Login session not found. Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_URL}/other-products/${encodeURIComponent(product.id)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to delete product.");
+      }
+
+      setProducts((currentProducts) =>
+        currentProducts.filter((item) => item.id !== product.id),
+      );
+      setSuccessMessage(
+        "Product removed from the active list. Stock IN history was kept.",
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to delete product.",
+      );
+    } finally {
+      setDeletingProductId(null);
+    }
+  }
 
   const filteredProducts = products.filter((product) => {
     const keyword = search.trim().toLowerCase();
@@ -200,6 +267,12 @@ export default function ProductListPage() {
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
+              {successMessage}
+            </div>
+          )}
+
           {/* Product Count */}
 
           <div className="mb-4 flex items-center justify-between">
@@ -264,7 +337,7 @@ export default function ProductListPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1200px] text-left">
+                  <table className="w-full min-w-[1320px] text-left">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
                         <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -310,6 +383,12 @@ export default function ProductListPage() {
                         <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                           Status
                         </th>
+
+                        {isAdmin && (
+                          <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Action
+                          </th>
+                        )}
                       </tr>
                     </thead>
 
@@ -456,6 +535,23 @@ export default function ProductListPage() {
                                   : "INACTIVE"}
                               </span>
                             </td>
+
+                            {isAdmin && (
+                              <td className="px-5 py-4">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void deleteProduct(product);
+                                  }}
+                                  disabled={deletingProductId === product.id}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <Trash2 size={14} />
+                                  {deletingProductId === product.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
