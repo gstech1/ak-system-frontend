@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   ScanLine,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -57,8 +58,14 @@ type CheckedProduct = {
   physicalQty?: number;
 };
 
+type StockCountHistoryRow = { id: string; countNo: string; status: string; startedAt: string; completedAt?: string | null; items: { id: string }[]; warehouse?: { warehouseName?: string } };
+const MTK_SOLAR_WAREHOUSE_ID = "03398d3f-a459-42b4-9f89-f85bd524701c";
+
 export default function StockCountPage() {
   const [stocks, setStocks] = useState<WarehouseStock[]>([]);
+  const [stockCounts, setStockCounts] = useState<StockCountHistoryRow[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deletingCountId, setDeletingCountId] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -132,7 +139,31 @@ export default function StockCountPage() {
 
   useEffect(() => {
     loadStock();
+    try { setIsSuperAdmin(JSON.parse(localStorage.getItem("authUser") || "null")?.role === "ADMIN"); } catch { setIsSuperAdmin(false); }
+    void loadStockCounts();
   }, []);
+
+  async function loadStockCounts() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stock-count?warehouseId=${MTK_SOLAR_WAREHOUSE_ID}`, { cache: "no-store" });
+      const data = await response.json();
+      if (response.ok) setStockCounts(Array.isArray(data) ? data : []);
+    } catch (err) { console.error("Unable to load stock count history", err); }
+  }
+
+  async function deleteStockCount(count: StockCountHistoryRow) {
+    if (!window.confirm(`Delete stock count ${count.countNo}? This only removes the count record; warehouse quantities will not change.`)) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) { window.alert("Please sign in again to delete this stock count."); return; }
+    try {
+      setDeletingCountId(count.id);
+      const response = await fetch(`${API_BASE_URL}/stock-count/${count.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.message || "Unable to delete stock count.");
+      await loadStockCounts();
+    } catch (err) { window.alert(err instanceof Error ? err.message : "Unable to delete stock count."); }
+    finally { setDeletingCountId(""); }
+  }
 
   /* =====================================================
      REFRESH
@@ -1410,6 +1441,10 @@ export default function StockCountPage() {
           </div>
         )}
 
+        <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold text-slate-900">Stock Count History</h2><p className="mt-1 text-sm text-slate-500">Saved MTK warehouse count records.</p></div>
+          {stockCounts.length === 0 ? <p className="px-5 py-6 text-sm text-slate-500">No saved stock counts.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Count No.</th><th className="px-5 py-3">Date</th><th className="px-5 py-3">Products</th><th className="px-5 py-3">Status</th>{isSuperAdmin && <th className="px-5 py-3 text-right">Action</th>}</tr></thead><tbody>{stockCounts.map((count) => <tr key={count.id} className="border-t border-slate-100"><td className="px-5 py-3 font-mono font-semibold">{count.countNo}</td><td className="px-5 py-3">{new Date(count.startedAt).toLocaleString()}</td><td className="px-5 py-3">{count.items?.length ?? 0}</td><td className="px-5 py-3">{count.status}</td>{isSuperAdmin && <td className="px-5 py-3 text-right"><button type="button" disabled={deletingCountId === count.id} onClick={() => void deleteStockCount(count)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 size={14} />{deletingCountId === count.id ? "Deleting…" : "Delete"}</button></td>}</tr>)}</tbody></table></div>}
+        </section>
       </div>
       </main>
   </DashboardShell>

@@ -7,6 +7,7 @@ import {
   Printer,
   RefreshCw,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -54,6 +55,8 @@ export default function VoucherHistoryPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
   // ==================== VIEW DETAIL ====================
 
@@ -99,8 +102,26 @@ export default function VoucherHistoryPage() {
   };
 
   useEffect(() => {
+    try {
+      setIsSuperAdmin(JSON.parse(localStorage.getItem("authUser") || "null")?.role === "ADMIN");
+    } catch { setIsSuperAdmin(false); }
     loadVouchers();
   }, []);
+
+  const deleteVoucher = async (voucher: Voucher) => {
+    if (!window.confirm(`Delete voucher ${voucher.stockOutNo}? Regular vouchers return their quantities to warehouse stock.`)) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) { setError("Please sign in again to delete this voucher."); return; }
+    try {
+      setDeletingId(voucher.id);
+      const response = await fetch(`${API_BASE_URL}/stock-out/${voucher.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.message || "Unable to delete voucher.");
+      if (selectedVoucher?.id === voucher.id) setSelectedVoucher(null);
+      await loadVouchers();
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete voucher."); }
+    finally { setDeletingId(""); }
+  };
 
   // ==================== SEARCH ====================
 
@@ -639,6 +660,7 @@ export default function VoucherHistoryPage() {
                         <Eye size={17} />
                         View
                       </button>
+                      {isSuperAdmin && <button type="button" disabled={deletingId === voucher.id} onClick={() => void deleteVoucher(voucher)} className="flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 size={16} />{deletingId === voucher.id ? "Deleting…" : "Delete"}</button>}
                     </div>
                   </div>
                 ),

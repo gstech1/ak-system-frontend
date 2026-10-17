@@ -67,6 +67,8 @@ export default function ServiceReturnPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
   useEffect(() => {
     loadServiceIssues();
@@ -76,6 +78,7 @@ export default function ServiceReturnPage() {
     if (authUserRaw) {
       try {
         const authUser = JSON.parse(authUserRaw);
+        setIsSuperAdmin(authUser?.role === "ADMIN");
 
         if (authUser?.id) {
           setCreatedById(authUser.id);
@@ -85,6 +88,21 @@ export default function ServiceReturnPage() {
       }
     }
   }, []);
+
+  async function deleteReturn(returnItem: ServiceReturnItem) {
+    if (!window.confirm("Delete this Service Return record? Returned quantities will be removed from warehouse stock.")) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) { setError("Please sign in again to delete this record."); return; }
+    try {
+      setDeletingId(returnItem.id);
+      const response = await fetch(`${API_BASE_URL}/service-return/${returnItem.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.message || "Unable to delete Service Return.");
+      setMessage("Service Return deleted.");
+      await loadServiceIssues();
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete Service Return."); }
+    finally { setDeletingId(""); }
+  }
 
   async function loadServiceIssues() {
     try {
@@ -704,6 +722,7 @@ export default function ServiceReturnPage() {
           <th className="px-3 py-3 font-semibold">
             Date
           </th>
+          {isSuperAdmin && <th className="px-3 py-3 text-right font-semibold">Action</th>}
         </tr>
       </thead>
 
@@ -740,6 +759,7 @@ export default function ServiceReturnPage() {
                       ).toLocaleString()
                     : "-"}
                 </td>
+                {isSuperAdmin && <td className="px-3 py-3 text-right"><button type="button" disabled={deletingId === returnItem.id} onClick={() => void deleteReturn(returnItem)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">{deletingId === returnItem.id ? "Deleting…" : "Delete"}</button></td>}
               </tr>
             ),
           ),
@@ -752,7 +772,7 @@ export default function ServiceReturnPage() {
         ) && (
           <tr>
             <td
-              colSpan={4}
+              colSpan={isSuperAdmin ? 5 : 4}
               className="px-3 py-8 text-center text-sm text-slate-400"
             >
               No service return transactions yet.
@@ -1108,6 +1128,7 @@ export default function ServiceReturnPage() {
           <th className="px-3 py-3 font-semibold">
             Date
           </th>
+          {isSuperAdmin && <th className="px-3 py-3 text-right font-semibold">Action</th>}
         </tr>
       </thead>
 
@@ -1142,6 +1163,7 @@ export default function ServiceReturnPage() {
                     returnItem.createdAt,
                   ).toLocaleString()}
                 </td>
+                {isSuperAdmin && <td className="px-3 py-3 text-right"><button type="button" disabled={deletingId === returnItem.id} onClick={() => void deleteReturn(returnItem)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">{deletingId === returnItem.id ? "Deleting…" : "Delete"}</button></td>}
               </tr>
             ),
           )
@@ -1154,7 +1176,7 @@ export default function ServiceReturnPage() {
         ) && (
           <tr>
             <td
-              colSpan={4}
+              colSpan={isSuperAdmin ? 5 : 4}
               className="px-3 py-8 text-center"
             >
               <div className="text-sm text-slate-400">

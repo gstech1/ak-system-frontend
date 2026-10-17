@@ -99,6 +99,8 @@ export default function ServiceIssuePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] =
     useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
   async function loadProducts() {
     try {
@@ -169,9 +171,28 @@ export default function ServiceIssuePage() {
   }
 
   useEffect(() => {
+    try {
+      setIsSuperAdmin(JSON.parse(localStorage.getItem("authUser") || "null")?.role === "ADMIN");
+    } catch { setIsSuperAdmin(false); }
     void loadProducts();
     void loadHistory();
   }, []);
+
+  async function deleteIssue(issue: ServiceIssueHistory) {
+    if (!window.confirm(`Delete Service Issue ${issue.serviceIssueNo}? Its quantities will be returned to MTK warehouse stock.`)) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) { setErrorMessage("Please sign in again to delete this record."); return; }
+    try {
+      setDeletingId(issue.id);
+      const response = await fetch(`${API_URL}/service-issue/${issue.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.message || "Unable to delete Service Issue.");
+      setSuccessMessage("Service Issue deleted.");
+      await loadHistory();
+      await loadProducts();
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "Unable to delete Service Issue."); }
+    finally { setDeletingId(""); }
+  }
 
   function getAvailableStock(product: Product) {
     return (
@@ -1031,7 +1052,7 @@ export default function ServiceIssuePage() {
                           Status
                         </th>
                         <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Receipt
+                          Actions
                         </th>
                       </tr>
                     </thead>
@@ -1158,6 +1179,7 @@ export default function ServiceIssuePage() {
                               </td>
 
                               <td className="px-5 py-4 text-right">
+                                <div className="flex justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={() => printServiceIssueReceipt(issue)}
@@ -1165,6 +1187,8 @@ export default function ServiceIssuePage() {
                                 >
                                   <Printer size={15} /> Print 80 mm
                                 </button>
+                                {isSuperAdmin && <button type="button" disabled={deletingId === issue.id} onClick={() => void deleteIssue(issue)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 size={15} />{deletingId === issue.id ? "Deleting…" : "Delete"}</button>}
+                                </div>
                               </td>
                             </tr>
                           );
