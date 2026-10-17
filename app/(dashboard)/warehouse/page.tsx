@@ -71,7 +71,10 @@ export default function WarehousePage() {
     async function loadSummary() {
       try {
         const accessToken = localStorage.getItem("accessToken");
-        if (!accessToken) return;
+        if (!accessToken) {
+          setSummaryError("Login session not found. Please sign in again.");
+          return;
+        }
         const response = await fetch(`${API_BASE_URL}/dashboard/mtk-summary`, {
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: "no-store",

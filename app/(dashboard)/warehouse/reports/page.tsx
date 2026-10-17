@@ -142,7 +142,7 @@ export default function ReportsPage() {
             </div>
           )}
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {summary && !error && <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
             <ReportCard
               title="Current Stock"
@@ -180,7 +180,7 @@ export default function ReportsPage() {
               description="Active MTK products"
             />
 
-          </div>
+          </div>}
 
         </div>
       </div>
