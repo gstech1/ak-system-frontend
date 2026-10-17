@@ -162,6 +162,9 @@ export default function StockInPage() {
     useState("");
 
   const [historyOpen, setHistoryOpen] = useState(false);  
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingStockInId, setDeletingStockInId] =
+    useState<string | null>(null);
 
   const [historyVisibleCount, setHistoryVisibleCount] =
   useState(10);
@@ -171,6 +174,16 @@ const [historyDateFrom, setHistoryDateFrom] = useState("");
 const [historyDateTo, setHistoryDateTo] = useState("");
 
   useEffect(() => {
+    try {
+      const authUser = localStorage.getItem("authUser");
+      if (authUser) {
+        const parsedUser = JSON.parse(authUser) as AuthUser;
+        setIsAdmin(String(parsedUser.role || "").toUpperCase() === "ADMIN");
+      }
+    } catch {
+      setIsAdmin(false);
+    }
+
     const today = new Date();
 
     const year = today.getFullYear();
@@ -241,6 +254,49 @@ const [historyDateTo, setHistoryDateTo] = useState("");
       );
     } finally {
       setHistoryLoading(false);
+    }
+  }
+
+  async function deleteStockIn(transaction: StockInHistoryItem) {
+    const shouldDelete = window.confirm(
+      `Delete Stock IN ${transaction.stockInNo}? This will remove it from Stock IN history and subtract its quantity from warehouse stock.`,
+    );
+
+    if (!shouldDelete) return;
+
+    try {
+      setDeletingStockInId(transaction.id);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        throw new Error("Login session not found. Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/stock-in/${encodeURIComponent(transaction.id)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to delete Stock IN.");
+      }
+
+      setSuccessMessage(
+        `Stock IN ${transaction.stockInNo} was removed and its quantity was subtracted from warehouse stock.`,
+      );
+      await loadHistory();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to delete Stock IN.",
+      );
+    } finally {
+      setDeletingStockInId(null);
     }
   }
 
@@ -1268,6 +1324,12 @@ function filteredHistory() {
                     Status
                   </th>
 
+                  {isAdmin && (
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Action
+                    </th>
+                  )}
+
                 </tr>
               </thead>
 
@@ -1335,6 +1397,22 @@ function filteredHistory() {
                             {transaction.status}
                           </span>
                         </td>
+
+                        {isAdmin && (
+                          <td className="px-5 py-4">
+                            <button
+                              type="button"
+                              onClick={() => void deleteStockIn(transaction)}
+                              disabled={deletingStockInId === transaction.id}
+                              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Trash2 size={14} />
+                              {deletingStockInId === transaction.id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </td>
+                        )}
 
                       </tr>
                     );
