@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
+import DashboardShell from "@/components/layout/DashboardShell";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -59,8 +60,8 @@ export default function WarrantyReplacementRequestsPage() {
   useEffect(() => { void loadRows(); }, []);
 
   return (
-    <main className="min-h-screen bg-slate-100 px-3 py-5 sm:px-6 sm:py-7">
-      <div className="mx-auto max-w-5xl">
+    <DashboardShell>
+      <div className="mx-auto w-full max-w-5xl space-y-6">
         <header className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><ClipboardCheck size={22} /></div>
@@ -94,7 +95,7 @@ export default function WarrantyReplacementRequestsPage() {
           )}
         </section>
       </div>
-    </main>
+    </DashboardShell>
   );
 }
 
