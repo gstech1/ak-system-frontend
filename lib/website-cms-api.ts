@@ -2,6 +2,10 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5001"
 ).replace(/\/+$/, "");
+const WEBSITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://suntreemyanmar.com"
+).replace(/\/+$/, "");
 
 export function getWebsiteCmsImageUrl(
   image: string | null | undefined,
@@ -13,6 +17,11 @@ export function getWebsiteCmsImageUrl(
   const uploadIndex = normalized.indexOf("website-cms/uploads/");
   if (uploadIndex >= 0) {
     return `${API_URL}/${normalized.slice(uploadIndex)}`;
+  }
+
+  const productImageIndex = normalized.indexOf("images/products/");
+  if (productImageIndex >= 0) {
+    return `${WEBSITE_URL}/${normalized.slice(productImageIndex)}`;
   }
 
   if (/^https?:\/\//i.test(value)) {
