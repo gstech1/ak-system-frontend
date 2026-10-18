@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getWebsiteProductCategories } from "@/lib/website-cms-api";
+import {
+  getWebsiteCmsImageUrl,
+  getWebsiteProductCategories,
+} from "@/lib/website-cms-api";
 import ProductManager from "./ProductManager";
 import CategorySelector from "./CategorySelector";
 import ProductEditor from "./ProductEditor";
@@ -33,30 +36,6 @@ function ImageBox({
       </div>
     </div>
   );
-}
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001"
-).replace(/\/+$/, "");
-
-function getImageUrl(
-  image: string | null | undefined,
-) {
-  if (!image) return "";
-
-  if (
-    image.startsWith("http://") ||
-    image.startsWith("https://")
-  ) {
-    return image;
-  }
-
-  if (image.startsWith("/website-cms/uploads/")) {
-    return `${API_URL}${image}`;
-  }
-
-  return image;
 }
 
 const galleryCategorySlugs = [
@@ -284,7 +263,7 @@ export default async function ProductDetailPage({
 
                       {/* Main Product Image */}
                       <ImageBox
-  src={getImageUrl(product.mainImage)}
+  src={getWebsiteCmsImageUrl(product.mainImage)}
   label="Main Product Image"
 />
 
@@ -313,7 +292,7 @@ export default async function ProductDetailPage({
                                   key={
                                     imageIndex
                                   }
-                                  src={getImageUrl(
+                                  src={getWebsiteCmsImageUrl(
   product.images?.[imageIndex]?.imageUrl,
 )}
                                   label={`Detail Image ${
@@ -332,7 +311,7 @@ export default async function ProductDetailPage({
                       {/* Specification */}
                       {!isGalleryCategory && (
                         <ImageBox
-  src={getImageUrl(
+  src={getWebsiteCmsImageUrl(
     product.specificationImage,
   )}
   label="Specification Image"

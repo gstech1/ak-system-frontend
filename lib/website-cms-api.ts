@@ -3,6 +3,36 @@ const API_URL = (
   "http://localhost:5001"
 ).replace(/\/+$/, "");
 
+export function getWebsiteCmsImageUrl(
+  image: string | null | undefined,
+): string {
+  const value = image?.trim();
+  if (!value) return "";
+
+  const normalized = value.replace(/\\/g, "/");
+  const uploadIndex = normalized.indexOf("website-cms/uploads/");
+  if (uploadIndex >= 0) {
+    return `${API_URL}/${normalized.slice(uploadIndex)}`;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      if (
+        url.protocol === "http:" &&
+        url.hostname === new URL(API_URL).hostname
+      ) {
+        url.protocol = "https:";
+      }
+      return url.toString();
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
+}
+
 export function getWebsiteCmsAuthHeaders(): HeadersInit {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("accessToken");

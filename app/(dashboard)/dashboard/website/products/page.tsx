@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { getWebsiteProductCategories } from "@/lib/website-cms-api";
+import {
+  getWebsiteCmsImageUrl,
+  getWebsiteProductCategories,
+} from "@/lib/website-cms-api";
 
 const circuitProtectionSlugs = [
   "dc-circuit-breaker",
@@ -28,7 +31,7 @@ function CategoryRow({
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
             {category.heroImage ? (
               <img
-                src={category.heroImage}
+                src={getWebsiteCmsImageUrl(category.heroImage)}
                 alt=""
                 className="h-full w-full object-contain"
               />
@@ -74,7 +77,11 @@ function CategoryRow({
         </Link>
 
         <Link
-          href="/products/circuit-protection"
+          href={
+            circuitProtectionSlugs.includes(category.slug)
+              ? `/products/circuit-protection?category=${category.slug}`
+              : `/products/${category.slug}`
+          }
           target="_blank"
           className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >

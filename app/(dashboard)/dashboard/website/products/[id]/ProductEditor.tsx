@@ -2,33 +2,10 @@
 
 import { useState } from "react";
 import {
+  getWebsiteCmsImageUrl,
   updateWebsiteProduct,
   uploadWebsiteImage,
 } from "@/lib/website-cms-api";
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001"
-).replace(/\/+$/, "");
-
-function getImageUrl(
-  image: string | null | undefined,
-) {
-  if (!image) return "";
-
-  if (
-    image.startsWith("http://") ||
-    image.startsWith("https://")
-  ) {
-    return image;
-  }
-
-  if (image.startsWith("/website-cms/uploads/")) {
-    return `${API_URL}${image}`;
-  }
-
-  return image;
-}
 
 type ProductEditorProps = {
   product: {
@@ -61,7 +38,7 @@ export default function ProductEditor({
 
   const [mainPreview, setMainPreview] =
   useState<string | null>(
-    getImageUrl(product.mainImage),
+    getWebsiteCmsImageUrl(product.mainImage),
   );
 
   const [specificationImage, setSpecificationImage] =
@@ -86,10 +63,10 @@ export default function ProductEditor({
 
   const [detailPreviews, setDetailPreviews] =
   useState<(string | null)[]>([
-    getImageUrl(product.images?.[0]?.imageUrl),
-    getImageUrl(product.images?.[1]?.imageUrl),
-    getImageUrl(product.images?.[2]?.imageUrl),
-    getImageUrl(product.images?.[3]?.imageUrl),
+    getWebsiteCmsImageUrl(product.images?.[0]?.imageUrl),
+    getWebsiteCmsImageUrl(product.images?.[1]?.imageUrl),
+    getWebsiteCmsImageUrl(product.images?.[2]?.imageUrl),
+    getWebsiteCmsImageUrl(product.images?.[3]?.imageUrl),
   ]);
 
   function handleMainImage(
@@ -258,7 +235,7 @@ export default function ProductEditor({
           setSpecificationImage(null);
 
           setMainPreview(
-  getImageUrl(product.mainImage),
+  getWebsiteCmsImageUrl(product.mainImage),
 );
 
           setSpecificationPreview(
@@ -274,10 +251,10 @@ export default function ProductEditor({
           ]);
 
           setDetailPreviews([
-  getImageUrl(product.images?.[0]?.imageUrl),
-  getImageUrl(product.images?.[1]?.imageUrl),
-  getImageUrl(product.images?.[2]?.imageUrl),
-  getImageUrl(product.images?.[3]?.imageUrl),
+  getWebsiteCmsImageUrl(product.images?.[0]?.imageUrl),
+  getWebsiteCmsImageUrl(product.images?.[1]?.imageUrl),
+  getWebsiteCmsImageUrl(product.images?.[2]?.imageUrl),
+  getWebsiteCmsImageUrl(product.images?.[3]?.imageUrl),
 ]);
 
           setOpen(true);
