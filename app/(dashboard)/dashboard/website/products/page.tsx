@@ -4,6 +4,11 @@ import {
   getWebsiteProductCategories,
 } from "@/lib/website-cms-api";
 
+const WEBSITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://suntreemyanmar.com"
+).replace(/\/+$/, "");
+
 const circuitProtectionSlugs = [
   "dc-circuit-breaker",
   "ac-circuit-breaker",
@@ -77,11 +82,11 @@ function CategoryRow({
         </Link>
 
         <Link
-          href={
+          href={`${WEBSITE_URL}${
             circuitProtectionSlugs.includes(category.slug)
               ? `/products/circuit-protection?category=${category.slug}`
               : `/products/${category.slug}`
-          }
+          }`}
           target="_blank"
           className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
