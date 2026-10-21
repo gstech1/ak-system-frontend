@@ -54,6 +54,7 @@ export default function ShipmentsPage() {
     useState<SuntreeServiceIssue[]>([]);
   const [listMode, setListMode] = useState<"SALES" | "SERVICE" | "RETURN">("SALES");
   const [showServiceForm, setShowServiceForm] = useState(false);
+  const [showReturnPanel, setShowReturnPanel] = useState(false);
   const [serviceSaving, setServiceSaving] = useState(false);
   const [issueNo, setIssueNo] = useState("");
   const [serviceDepartment, setServiceDepartment] = useState("");
@@ -331,6 +332,7 @@ export default function ShipmentsPage() {
       setSuccess(`Service issue ${issue.issueNo} closed. Returned: ${returnedSerials.length}; sold with active warranty: ${soldCount}.`);
       setReturnIssueId("");
       setReturnedSerials([]);
+      setShowReturnPanel(false);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to complete service return.");
@@ -581,6 +583,10 @@ export default function ShipmentsPage() {
   const serviceSoldIssues = serviceIssues.filter((issue) =>
     issue.items.some((item) => item.disposition === "SOLD"),
   );
+  const serviceReturnedCount = serviceIssues.reduce(
+    (count, issue) => count + issue.items.filter((item) => item.disposition === "RETURNED").length,
+    0,
+  );
   const selectedReturnIssue = serviceIssues.find((item) => item.id === returnIssueId && item.status === "OPEN");
 
   function getStatusClass(
@@ -612,18 +618,17 @@ export default function ShipmentsPage() {
           />
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <button type="button" onClick={() => {
-              setError(""); setSuccess(""); setShowServiceForm(false); resetForm(); setShowForm(true); setListMode("SALES");
+              setError(""); setSuccess(""); setShowServiceForm(false); setShowReturnPanel(false); resetForm(); setShowForm(true); setListMode("SALES");
             }} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">
               + Create Shipment
             </button>
             <button type="button" onClick={() => {
-              setError(""); setSuccess(""); setShowForm(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
+              setError(""); setSuccess(""); setShowForm(false); setShowReturnPanel(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
             }} className="rounded-xl border border-emerald-700 bg-white px-5 py-3 font-bold text-emerald-800 transition hover:bg-emerald-50">
               Service Issue
             </button>
             <button type="button" onClick={() => {
-              setError(""); setSuccess(""); setShowForm(false); setShowServiceForm(false); resetForm(); setListMode("RETURN");
-              window.setTimeout(() => document.getElementById("stock-out-list")?.scrollIntoView({ behavior: "smooth" }), 0);
+              setError(""); setSuccess(""); setShowForm(false); setShowServiceForm(false); resetForm(); setShowReturnPanel(true);
             }} className="rounded-xl border border-amber-500 bg-white px-5 py-3 font-bold text-amber-800 transition hover:bg-amber-50">
               Service Return
             </button>
@@ -641,6 +646,21 @@ export default function ShipmentsPage() {
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700">
             {success}
           </div>
+        )}
+
+        {showReturnPanel && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <ServiceReturnPanel
+              issue={selectedReturnIssue}
+              scan={returnScan}
+              onScanChange={setReturnScan}
+              onScan={() => void addReturnedSerial()}
+              returnedSerials={returnedSerials}
+              saving={serviceSaving}
+              onComplete={() => void handleCompleteServiceReturn()}
+              onClear={() => { setReturnIssueId(""); setReturnedSerials([]); setReturnScan(""); setError(""); }}
+            />
+          </section>
         )}
 
         {showServiceForm && (
@@ -892,7 +912,7 @@ export default function ShipmentsPage() {
                   {listMode === "SALES" ? "Sales / Shipment List" : listMode === "SERVICE" ? "Service Use List" : "Service Return"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {listMode === "SALES" ? `${shipments.length} dealer shipment(s) · ${serviceSoldIssues.length} service sale(s)` : listMode === "SERVICE" ? `${serviceIssues.length} service issue(s) recorded.` : "Scan returned serials and compare them with Service Issue records."}
+                  {listMode === "SALES" ? `${shipments.length} dealer shipment(s) · ${serviceSoldIssues.length} service sale(s)` : listMode === "SERVICE" ? `${serviceIssues.length} service issue(s) recorded.` : `${serviceReturnedCount} item(s) returned from Service Issues.`}
                 </p>
               </div>
               <div className="flex rounded-xl bg-slate-100 p-1">
@@ -1052,16 +1072,39 @@ export default function ShipmentsPage() {
           </div>}
             </>
           ) : listMode === "RETURN" ? (
-            <ServiceReturnPanel
-              issue={selectedReturnIssue}
-              scan={returnScan}
-              onScanChange={setReturnScan}
-              onScan={() => void addReturnedSerial()}
-              returnedSerials={returnedSerials}
-              saving={serviceSaving}
-              onComplete={() => void handleCompleteServiceReturn()}
-              onClear={() => { setReturnIssueId(""); setReturnedSerials([]); setReturnScan(""); setError(""); }}
-            />
+            serviceIssues.some((issue) => issue.items.some((item) => item.disposition === "RETURNED")) ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Service Issue</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Department / Project</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Service Person</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Returned Serials</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Issued Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceIssues.flatMap((issue) => {
+                      const returnedItems = issue.items.filter((item) => item.disposition === "RETURNED");
+                      if (returnedItems.length === 0) return [];
+                      return [<tr key={issue.id} className="border-b border-slate-100 last:border-0 align-top">
+                        <td className="px-6 py-4 font-mono text-sm font-semibold text-emerald-700">{issue.issueNo}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{issue.serviceDepartment}<br /><span className="text-slate-500">{issue.projectName}</span></td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{issue.servicePerson}</td>
+                        <td className="px-6 py-4"><div className="flex flex-wrap gap-2">{returnedItems.map((item) => <span key={item.id} className="rounded-md bg-emerald-50 px-2 py-1 font-mono text-xs text-emerald-800">{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}</span>)}</div><span className="mt-2 block text-xs text-slate-500">{returnedItems.length} item(s)</span></td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{formatDate(issue.issuedDate)}</td>
+                      </tr>];
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-6 py-12 text-center">
+                <p className="font-semibold text-slate-700">No returned items recorded yet.</p>
+                <p className="mt-1 text-sm text-slate-500">Use the Service Return button above to scan returned serials.</p>
+              </div>
+            )
           ) : listMode === "SERVICE" && serviceIssues.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="font-semibold text-slate-700">No service issues found.</p>
@@ -1089,7 +1132,7 @@ export default function ShipmentsPage() {
                       <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{returnedCount} returned</span>
                       <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">{soldCount} sold · warranty active</span>
                       <button type="button" onClick={() => printServiceReceipt(issue)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"><Printer size={15} /> Print 80 mm</button>
-                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); setListMode("RETURN"); window.setTimeout(() => document.getElementById("stock-out-list")?.scrollIntoView({ behavior: "smooth" }), 0); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
+                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); setListMode("SERVICE"); setShowReturnPanel(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
