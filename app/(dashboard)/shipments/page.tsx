@@ -54,6 +54,7 @@ export default function ShipmentsPage() {
     useState<SuntreeServiceIssue[]>([]);
   const [listMode, setListMode] = useState<"SALES" | "SERVICE">("SALES");
   const [showServiceForm, setShowServiceForm] = useState(false);
+  const [showReturnPanel, setShowReturnPanel] = useState(false);
   const [serviceSaving, setServiceSaving] = useState(false);
   const [issueNo, setIssueNo] = useState("");
   const [serviceDepartment, setServiceDepartment] = useState("");
@@ -289,11 +290,19 @@ export default function ShipmentsPage() {
 
   async function addReturnedSerial() {
     const serialNumber = returnScan.replace(/\D/g, "");
-    if (!serialNumber || !returnIssueId) return;
-    const issue = serviceIssues.find((item) => item.id === returnIssueId);
+    if (!serialNumber) return;
+    const selectedIssue = serviceIssues.find((item) => item.id === returnIssueId && item.status === "OPEN");
+    const issue = selectedIssue ?? serviceIssues.find((item) =>
+      item.status === "OPEN" && item.items.some((entry) => entry.serial.serialNumber === serialNumber && entry.disposition === "ISSUED"),
+    );
     const eligible = issue?.items.some((item) => item.serial.serialNumber === serialNumber && item.disposition === "ISSUED");
-    if (!eligible) {
-      setError(`Serial ${serialNumber} is not an outstanding serial in this service issue.`);
+    if (!issue || !eligible) {
+      setError(`Serial ${serialNumber} was not found in an open Service Issue. Check the barcode or finish the selected issue first.`);
+      setReturnScan("");
+      return;
+    }
+    if (selectedIssue && !selectedIssue.items.some((item) => item.serial.serialNumber === serialNumber && item.disposition === "ISSUED")) {
+      setError(`Serial ${serialNumber} belongs to another Service Issue. Complete or clear the current return first.`);
       setReturnScan("");
       return;
     }
@@ -302,6 +311,7 @@ export default function ShipmentsPage() {
       setReturnScan("");
       return;
     }
+    if (!returnIssueId) setReturnIssueId(issue.id);
     setReturnedSerials((current) => [...current, serialNumber]);
     setReturnScan("");
     setError("");
@@ -322,6 +332,7 @@ export default function ShipmentsPage() {
       setSuccess(`Service issue ${issue.issueNo} closed. Returned: ${returnedSerials.length}; sold with active warranty: ${soldCount}.`);
       setReturnIssueId("");
       setReturnedSerials([]);
+      setShowReturnPanel(false);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to complete service return.");
@@ -572,6 +583,7 @@ export default function ShipmentsPage() {
   const serviceSoldIssues = serviceIssues.filter((issue) =>
     issue.items.some((item) => item.disposition === "SOLD"),
   );
+  const selectedReturnIssue = serviceIssues.find((item) => item.id === returnIssueId && item.status === "OPEN");
 
   function getStatusClass(
     status: string,
@@ -602,14 +614,19 @@ export default function ShipmentsPage() {
           />
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <button type="button" onClick={() => {
-              setError(""); setSuccess(""); setShowServiceForm(false); resetForm(); setShowForm(true); setListMode("SALES");
+              setError(""); setSuccess(""); setShowServiceForm(false); setShowReturnPanel(false); resetForm(); setShowForm(true); setListMode("SALES");
             }} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">
               + Create Shipment
             </button>
             <button type="button" onClick={() => {
-              setError(""); setSuccess(""); setShowForm(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
+              setError(""); setSuccess(""); setShowForm(false); setShowReturnPanel(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
             }} className="rounded-xl border border-emerald-700 bg-white px-5 py-3 font-bold text-emerald-800 transition hover:bg-emerald-50">
-              Service Issue / Return
+              Service Issue
+            </button>
+            <button type="button" onClick={() => {
+              setError(""); setSuccess(""); setShowForm(false); setShowServiceForm(false); resetForm(); setListMode("SERVICE"); setShowReturnPanel(true);
+            }} className="rounded-xl border border-amber-500 bg-white px-5 py-3 font-bold text-amber-800 transition hover:bg-amber-50">
+              Service Return
             </button>
           </div>
         </div>
@@ -625,6 +642,21 @@ export default function ShipmentsPage() {
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700">
             {success}
           </div>
+        )}
+
+        {showReturnPanel && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <ServiceReturnPanel
+              issue={selectedReturnIssue}
+              scan={returnScan}
+              onScanChange={setReturnScan}
+              onScan={() => void addReturnedSerial()}
+              returnedSerials={returnedSerials}
+              saving={serviceSaving}
+              onComplete={() => void handleCompleteServiceReturn()}
+              onClear={() => { setReturnIssueId(""); setReturnedSerials([]); setReturnScan(""); setError(""); }}
+            />
+          </section>
         )}
 
         {showServiceForm && (
@@ -671,39 +703,6 @@ export default function ShipmentsPage() {
             </form>
           </section>
         )}
-
-        {returnIssueId && (() => {
-          const issue = serviceIssues.find((item) => item.id === returnIssueId);
-          if (!issue) return null;
-          return (
-            <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Service Return · {issue.issueNo}</h2>
-                  <p className="mt-1 text-sm text-slate-500">Scan only the serials physically returned. Anything left unscanned will be recorded as sold and warranty will start.</p>
-                </div>
-                <button type="button" onClick={() => { setReturnIssueId(""); setReturnedSerials([]); }} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Cancel</button>
-              </div>
-              <p className="mb-4 text-sm text-slate-600">{issue.serviceDepartment} · {issue.projectName} · {issue.servicePerson}</p>
-              <div className="flex gap-2">
-                <input value={returnScan} onChange={(e) => setReturnScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addReturnedSerial(); } }} placeholder="Scan returned serial and press Enter" inputMode="numeric" className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-4 font-mono text-sm" />
-                <button type="button" onClick={() => void addReturnedSerial()} className="rounded-xl border border-slate-300 px-5 font-semibold">Add Return</button>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {issue.items.filter((item) => item.disposition === "ISSUED").map((item) => {
-                  const returned = returnedSerials.includes(item.serial.serialNumber);
-                  return <div key={item.id} className={`rounded-xl border px-3 py-2 text-sm ${returned ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                    <span className="font-mono">{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}</span>
-                    <span className="float-right font-semibold">{returned ? "Returned" : "Pending"}</span>
-                  </div>;
-                })}
-              </div>
-              <div className="mt-5 flex justify-end">
-                <button type="button" disabled={serviceSaving} onClick={() => void handleCompleteServiceReturn()} className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60">{serviceSaving ? "Saving..." : "Complete Return & Record Sales"}</button>
-              </div>
-            </section>
-          );
-        })()}
 
         {/* Create Form */}
         {showForm && (
@@ -906,7 +905,7 @@ export default function ShipmentsPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
-                  {listMode === "SALES" ? "Sales / Shipment List" : "Service Issue / Return List"}
+                  {listMode === "SALES" ? "Sales / Shipment List" : "Service Use List"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   {listMode === "SALES" ? `${shipments.length} dealer shipment(s) · ${serviceSoldIssues.length} service sale(s)` : `${serviceIssues.length} service issue(s) recorded.`}
@@ -1067,12 +1066,12 @@ export default function ShipmentsPage() {
             </div>
           </div>}
             </>
-          ) : serviceIssues.length === 0 ? (
+          ) : listMode === "SERVICE" && serviceIssues.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <p className="font-semibold text-slate-700">No service issues found.</p>
               <p className="mt-1 text-sm text-slate-500">Create a service issue to record serials taken by the service team.</p>
             </div>
-          ) : (
+          ) : listMode === "SERVICE" ? (
             <div className="divide-y divide-slate-100">
               {serviceIssues.map((issue) => {
                 const returnedCount = issue.items.filter((item) => item.disposition === "RETURNED").length;
@@ -1094,7 +1093,7 @@ export default function ShipmentsPage() {
                       <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{returnedCount} returned</span>
                       <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">{soldCount} sold · warranty active</span>
                       <button type="button" onClick={() => printServiceReceipt(issue)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"><Printer size={15} /> Print 80 mm</button>
-                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
+                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); setShowReturnPanel(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -1104,9 +1103,110 @@ export default function ShipmentsPage() {
                 </article>;
               })}
             </div>
-          )}
+          ) : null}
         </section>
       </div>
     </DashboardShell>
+  );
+}
+
+function ServiceReturnPanel({
+  issue,
+  scan,
+  onScanChange,
+  onScan,
+  returnedSerials,
+  saving,
+  onComplete,
+  onClear,
+}: {
+  issue?: SuntreeServiceIssue;
+  scan: string;
+  onScanChange: (value: string) => void;
+  onScan: () => void;
+  returnedSerials: string[];
+  saving: boolean;
+  onComplete: () => void;
+  onClear: () => void;
+}) {
+  const issueItems = issue?.items.filter((item) => item.disposition === "ISSUED") ?? [];
+  const returnedItems = issueItems.filter((item) => returnedSerials.includes(item.serial.serialNumber));
+  const usedItems = issueItems.filter((item) => !returnedSerials.includes(item.serial.serialNumber));
+
+  return (
+    <div className="p-5 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Scan Returned Item</h3>
+          <p className="mt-1 text-sm text-slate-500">Barcode ဖတ်လိုက်တာနဲ့ ဖွင့်ထားတဲ့ Service Issue စာရင်းမှာ အလိုအလျောက်စစ်ပေးပါမယ်။</p>
+        </div>
+        {issue && <button type="button" onClick={onClear} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Clear</button>}
+      </div>
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          value={scan}
+          onChange={(event) => onScanChange(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onScan(); } }}
+          placeholder="Scan returned serial barcode and press Enter"
+          inputMode="numeric"
+          className="h-11 min-w-0 flex-1 rounded-xl border border-slate-300 px-4 font-mono text-sm"
+        />
+        <button type="button" onClick={onScan} className="rounded-xl border border-slate-300 px-5 font-semibold">Add</button>
+      </div>
+      {!issue ? (
+        <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">စတင်ရန် ပြန်အပ်လာတဲ့ပစ္စည်းရဲ့ barcode ကို scan ဖတ်ပါ။ ဖွင့်ထားတဲ့ Service Issue နဲ့ ကိုက်ညီမှ စာရင်းပြပါမယ်။</p>
+      ) : (
+        <>
+          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <span className="font-mono font-bold text-emerald-700">{issue.issueNo}</span>
+            <span className="mx-2">·</span>{issue.serviceDepartment} · {issue.projectName} · {issue.servicePerson}
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <SerialList title="ပြန်အပ်ပြီး" hint="Scan ဖတ်ပြီး လက်ကျန်ထဲပြန်ဝင်မည့်ပစ္စည်း" items={returnedItems} tone="green" empty="ပြန်အပ်ထားတဲ့ barcode မရှိသေးပါ။" />
+            <SerialList title="ပြန်မအပ်ရသေး / သုံးပြီး" hint="မ scan ရသေးပါ။ အပြီးသတ်လျှင် ရောင်းပြီးအဖြစ် မှတ်တမ်းတင်ပါမည်။" items={usedItems} tone="amber" empty="ကျန်တဲ့ပစ္စည်းမရှိပါ။" />
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">ပြန်အပ်: {returnedItems.length} ခု · သုံးပြီး/မပြန်အပ်: {usedItems.length} ခု</p>
+            <button type="button" disabled={saving} onClick={onComplete} className="rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white disabled:opacity-60">{saving ? "Saving..." : "Complete Return & Record Sales"}</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SerialList({
+  title,
+  hint,
+  items,
+  tone,
+  empty,
+}: {
+  title: string;
+  hint: string;
+  items: SuntreeServiceIssue["items"];
+  tone: "green" | "amber";
+  empty: string;
+}) {
+  const colors = tone === "green"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+    : "border-amber-200 bg-amber-50 text-amber-900";
+
+  return (
+    <section className={`rounded-xl border p-4 ${tone === "green" ? "border-emerald-200" : "border-amber-200"}`}>
+      <div className="mb-3">
+        <h4 className="font-bold text-slate-900">{title} <span className="text-sm font-semibold text-slate-500">({items.length})</span></h4>
+        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+      </div>
+      <div className="max-h-64 space-y-2 overflow-y-auto">
+        {items.length === 0 ? <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">{empty}</p> : items.map((item) => (
+          <div key={item.id} className={`rounded-lg border px-3 py-2 text-sm ${colors}`}>
+            <span className="font-mono">{item.serial.serialNumber.replace(/(\d{3})(?=\d)/g, "$1 ")}</span>
+            {item.serial.product?.name && <span className="ml-2 text-xs opacity-75">{item.serial.product.name}</span>}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
