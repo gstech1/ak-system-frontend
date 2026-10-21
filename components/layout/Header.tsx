@@ -3,6 +3,7 @@
 import { Bell, LogOut, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useDashboardLanguage } from "@/components/layout/DashboardLanguageProvider";
 
 type AuthUser = {
   id?: string;
@@ -14,21 +15,9 @@ type AuthUser = {
 
 export default function Header() {
   const pathname = usePathname();
+  const { language, setLanguage } = useDashboardLanguage();
 
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [language, setLanguage] = useState<"en" | "my">("en");
-
-  function changeLanguage(nextLanguage: "en" | "my") {
-    setLanguage(nextLanguage);
-    localStorage.setItem("dashboardLanguage", nextLanguage);
-
-    window.dispatchEvent(
-      new CustomEvent("dashboard-language-change", {
-        detail: nextLanguage,
-      }),
-    );
-  }
-
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("authUser");
@@ -94,11 +83,10 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {isMTKSolar && (
-          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
             <button
               type="button"
-              onClick={() => changeLanguage("en")}
+              onClick={() => setLanguage("en")}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 language === "en"
                   ? "bg-blue-600 text-white shadow-sm"
@@ -110,7 +98,7 @@ export default function Header() {
 
             <button
               type="button"
-              onClick={() => changeLanguage("my")}
+              onClick={() => setLanguage("my")}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                 language === "my"
                   ? "bg-blue-600 text-white shadow-sm"
@@ -119,8 +107,7 @@ export default function Header() {
             >
               မြန်မာ
             </button>
-          </div>
-        )}
+        </div>
 
         <div className="relative">
           <Search
