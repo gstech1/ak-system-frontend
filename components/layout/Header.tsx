@@ -13,23 +13,64 @@ type AuthUser = {
   websiteManagement?: boolean;
 };
 
+function getRoleLabel(role?: string) {
+  const normalized = role?.trim().toUpperCase();
+  if (!normalized) return "User";
+
+  const labels: Record<string, string> = {
+    ADMIN: "Admin",
+    BOSS: "Boss",
+    MANAGER: "Manager",
+    WAREHOUSE: "Warehouse",
+    SERVICE: "Service",
+    DEALER: "Dealer",
+    SALES: "Sales",
+    MARKETING: "Marketing",
+  };
+
+  return labels[normalized] ?? normalized;
+}
+
+function readCurrentUser(): AuthUser | null {
+  let storedUser: AuthUser = {};
+  try {
+    const rawUser = localStorage.getItem("authUser");
+    if (rawUser) {
+      const parsed = JSON.parse(rawUser);
+      if (parsed && typeof parsed === "object") storedUser = parsed;
+    }
+  } catch (error) {
+    console.error("Failed to read auth user:", error);
+  }
+
+  // The token is issued by the API and carries the authenticated role. Use it
+  // to recover missing or stale profile fields saved by an older frontend.
+  try {
+    const token = localStorage.getItem("accessToken");
+    const payload = token?.split(".")[1];
+    if (payload) {
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const claims = JSON.parse(atob(base64)) as AuthUser;
+      return { ...storedUser, ...claims };
+    }
+  } catch (error) {
+    console.error("Failed to read login token:", error);
+  }
+
+  return Object.keys(storedUser).length ? storedUser : null;
+}
+
 export default function Header() {
   const pathname = usePathname();
   const { language, setLanguage } = useDashboardLanguage();
 
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [userLoaded, setUserLoaded] = useState(false);
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem("authUser");
-
-      if (storedUser) {
-        // User is intentionally synchronized from localStorage.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.error("Failed to read auth user:", error);
-    }
+    // User profile is restored from the browser session after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(readCurrentUser());
+    setUserLoaded(true);
   }, []);
 
   // Only MTK Solar Warehouse uses MTK header.
@@ -41,22 +82,12 @@ export default function Header() {
     ? "MTK Solar"
     : "SuntreeMyanmar";
 
-  const isAdmin = user?.role === "ADMIN";
-
-  const displayName = isAdmin
-    ? "Super Admin"
-    : user?.username || "User";
-
-  const displayRole = isAdmin
-    ? "Administrator"
-    : user?.role
-      ? user.role.charAt(0) +
-        user.role.slice(1).toLowerCase()
-      : "User";
+  const displayName = userLoaded ? user?.username || "User" : "";
+  const displayRole = userLoaded ? getRoleLabel(user?.role) : "";
 
   const avatarLetter = displayName
     .charAt(0)
-    .toUpperCase();
+    .toUpperCase() || (userLoaded ? "U" : "·");
 
   function handleLogout() {
     localStorage.removeItem("accessToken");
@@ -78,7 +109,7 @@ export default function Header() {
         </h1>
 
         <p className="mt-1 text-sm text-slate-500">
-          Welcome back, {displayName}
+          Welcome back, <span data-no-translate>{displayName}</span>
         </p>
       </div>
 
@@ -129,7 +160,7 @@ export default function Header() {
           <Bell size={18} />
         </button>
 
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2">
+        <div data-no-translate className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 font-bold text-white">
             {avatarLetter}
           </div>
