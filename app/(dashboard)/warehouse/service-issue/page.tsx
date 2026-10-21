@@ -49,6 +49,7 @@ interface ServiceItem {
   product: Product;
   quantity: number;
   availableStock: number;
+  issuedBarcodes: string[];
 }
 
 interface HistoryProduct {
@@ -204,7 +205,7 @@ export default function ServiceIssuePage() {
     );
   }
 
-  function addProduct() {
+  async function addProduct() {
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -219,7 +220,8 @@ export default function ServiceIssuePage() {
 
     setSearching(true);
 
-    const product = products.find(
+    let scannedUnit: { barcode: string; status: string } | null = null;
+    let product = products.find(
       (item) =>
         item.productCode.toLowerCase() ===
           code.toLowerCase() ||
@@ -228,9 +230,25 @@ export default function ServiceIssuePage() {
           .includes(code.toLowerCase()),
     );
 
+    try {
+      const stockResponse = await fetch(
+        `${API_URL}/warehouse-stock/barcode/${encodeURIComponent(code)}?warehouseId=${MTK_SOLAR_WAREHOUSE_ID}`,
+        { cache: "no-store" },
+      );
+      if (stockResponse.ok) {
+        const stockData = await stockResponse.json();
+        if (stockData?.trackingType === "UNIT" && stockData?.unit) {
+          scannedUnit = stockData.unit;
+          product = products.find((item) => item.id === stockData.product?.id);
+        }
+      }
+    } catch {
+      // Product-code/quantity products can still use the loaded product list.
+    }
+
     if (!product) {
       setErrorMessage(
-        `Product not found: ${code}`,
+        `Product or available unit barcode not found: ${code}`,
       );
       setSearching(false);
       return;
@@ -253,22 +271,31 @@ export default function ServiceIssuePage() {
     );
 
     if (product.trackingType === "UNIT") {
-      if (existing) {
+      if (!scannedUnit || scannedUnit.status !== "IN_STOCK") {
+        setErrorMessage("For unit-tracked products, scan the individual barcode of a unit that is currently in stock.");
+        setSearching(false);
+        return;
+      }
+
+      if (availableStock <= 0 || (existing?.quantity || 0) >= availableStock) {
+        setErrorMessage(`No additional stock is available for ${product.productCode}.`);
+        setSearching(false);
+        return;
+      }
+
+      if (existing?.issuedBarcodes.includes(scannedUnit.barcode)) {
         setErrorMessage(
-          `${product.productCode} is already added.`,
+          `Barcode ${scannedUnit.barcode} has already been scanned.`,
         );
         setSearching(false);
         return;
       }
 
-      setItems((current) => [
-        ...current,
-        {
-          product,
-          quantity: 1,
-          availableStock,
-        },
-      ]);
+      setItems((current) => existing
+        ? current.map((item) => item.product.id === product!.id
+          ? { ...item, quantity: item.quantity + 1, availableStock, issuedBarcodes: [...item.issuedBarcodes, scannedUnit!.barcode] }
+          : item)
+        : [...current, { product: product!, quantity: 1, availableStock, issuedBarcodes: [scannedUnit!.barcode] }]);
     } else {
       const requestedQuantity = Math.max(
         1,
@@ -313,6 +340,7 @@ export default function ServiceIssuePage() {
             quantity:
               requestedQuantity,
             availableStock,
+            issuedBarcodes: [],
           },
         ]);
       }
@@ -429,6 +457,8 @@ export default function ServiceIssuePage() {
                     item.product.id,
                   quantity:
                     item.quantity,
+                  issuedBarcodes:
+                    item.issuedBarcodes,
                 }),
               ),
             }),
@@ -601,7 +631,7 @@ export default function ServiceIssuePage() {
               </div>
 
               <p className="mt-1 text-sm text-slate-500">
-                Scan the product barcode or enter the product code.
+                For tracked units, scan each unit barcode. For quantity products, scan the product code and enter the quantity.
               </p>
             </div>
 
@@ -626,7 +656,7 @@ export default function ServiceIssuePage() {
                       addProduct();
                     }
                   }}
-                  placeholder="Scan barcode..."
+                  placeholder="Scan unit barcode or product code..."
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 />
               </div>
@@ -830,10 +860,14 @@ export default function ServiceIssuePage() {
                             />
 
                             <span className="text-sm font-semibold text-slate-800">
-                              {
-                                item.product
-                                  .productCode
-                              }
+                              <>
+                                {item.product.productCode}
+                                {item.product.trackingType === "UNIT" && (
+                                  <span className="mt-1 block max-w-xs truncate text-xs font-normal text-slate-500" title={item.issuedBarcodes.join(", ")}>
+                                    {item.issuedBarcodes.join(", ")}
+                                  </span>
+                                )}
+                              </>
                             </span>
                           </div>
                         </td>
@@ -868,7 +902,7 @@ export default function ServiceIssuePage() {
                             .trackingType ===
                           "UNIT" ? (
                             <span className="inline-flex min-w-10 justify-center rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">
-                              1
+                              {item.issuedBarcodes.length}
                             </span>
                           ) : (
                             <input

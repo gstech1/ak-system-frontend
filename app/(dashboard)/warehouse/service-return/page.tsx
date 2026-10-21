@@ -15,12 +15,15 @@ type Product = {
   id: string;
   productCode: string;
   productName?: string | null;
+  trackingType?: "UNIT" | "QUANTITY";
 };
 
 type ServiceReturnItem = {
   id: string;
   returnedQuantity: number;
   usedQuantity: number;
+  returnedBarcodes?: string[] | null;
+  usedBarcodes?: string[] | null;
   createdAt: string;
 };
 
@@ -28,6 +31,7 @@ type ServiceIssueItem = {
   id: string;
   productId: string;
   quantity: number;
+  issuedBarcodes?: string[] | null;
   product: Product;
   serviceReturns?: ServiceReturnItem[];
 };
@@ -50,6 +54,9 @@ type ReturnInput = {
   remainingQuantity: number;
   returnQuantity: number;
   usedQuantity: number;
+  trackByBarcode: boolean;
+  returnedBarcodes: string[];
+  usedBarcodes: string[];
 };
 
 export default function ServiceReturnPage() {
@@ -60,6 +67,7 @@ export default function ServiceReturnPage() {
 
   const [createdById, setCreatedById] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [scanDisposition, setScanDisposition] = useState<"RETURNED" | "USED">("RETURNED");
   const [items, setItems] = useState<ReturnInput[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -186,6 +194,7 @@ export default function ServiceReturnPage() {
 
     setItems([]);
     setBarcode("");
+    setScanDisposition("RETURNED");
     setMessage("");
     setError("");
   }
@@ -207,8 +216,8 @@ export default function ServiceReturnPage() {
     const issueItem =
       selectedIssue.items.find(
         (item) =>
-          item.product.productCode ===
-            scanned ||
+          item.issuedBarcodes?.includes(scanned) ||
+          item.product.productCode === scanned ||
           item.product.id === scanned,
       );
 
@@ -238,6 +247,62 @@ export default function ServiceReturnPage() {
           issueItem.id,
       );
 
+    const issuedBarcodes = Array.isArray(issueItem.issuedBarcodes)
+      ? issueItem.issuedBarcodes
+      : [];
+    const trackByBarcode = issuedBarcodes.length > 0;
+
+    if (trackByBarcode) {
+      if (!issuedBarcodes.includes(scanned)) {
+        setError(`${scanned} is not one of the barcodes issued on this Service Issue.`);
+        setBarcode("");
+        return;
+      }
+      const alreadyProcessed = (issueItem.serviceReturns || []).some((row) =>
+        [...(row.returnedBarcodes || []), ...(row.usedBarcodes || [])].includes(scanned),
+      );
+      if (alreadyProcessed) {
+        setError(`${scanned} has already been processed.`);
+        setBarcode("");
+        return;
+      }
+      if (existing?.returnedBarcodes.includes(scanned) || existing?.usedBarcodes.includes(scanned)) {
+        setError(`${scanned} has already been scanned in this return.`);
+        setBarcode("");
+        return;
+      }
+
+      const returnedBarcodes = [...(existing?.returnedBarcodes || [])];
+      const usedBarcodes = [...(existing?.usedBarcodes || [])];
+      if (scanDisposition === "RETURNED") returnedBarcodes.push(scanned);
+      else usedBarcodes.push(scanned);
+
+      const nextItem: ReturnInput = {
+        issueItemId: issueItem.id,
+        productId: issueItem.productId,
+        barcode: issueItem.product.productCode,
+        issuedQuantity: Number(issueItem.quantity),
+        remainingQuantity: processed.remaining,
+        returnQuantity: returnedBarcodes.length,
+        usedQuantity: usedBarcodes.length,
+        trackByBarcode: true,
+        returnedBarcodes,
+        usedBarcodes,
+      };
+      setItems((current) => existing
+        ? current.map((item) => item.issueItemId === issueItem.id ? nextItem : item)
+        : [...current, nextItem]);
+      setBarcode("");
+      setError("");
+      return;
+    }
+
+    if (issueItem.product.productCode !== scanned && issueItem.product.id !== scanned) {
+      setError(`This Service Issue has no individual barcode history for ${scanned}. Scan the product code for quantity-tracked or older records.`);
+      setBarcode("");
+      return;
+    }
+
     if (existing) {
       setError(
         `${issueItem.product.productCode} is already added.`,
@@ -261,6 +326,9 @@ export default function ServiceReturnPage() {
         returnQuantity:
           processed.remaining,
         usedQuantity: 0,
+        trackByBarcode: false,
+        returnedBarcodes: [],
+        usedBarcodes: [],
       },
     ]);
 
@@ -373,11 +441,10 @@ export default function ServiceReturnPage() {
     }
 
     for (const item of items) {
-      if (
-        item.returnQuantity +
-          item.usedQuantity !==
-        item.remainingQuantity
-      ) {
+      const processedCount = item.returnQuantity + item.usedQuantity;
+      if (item.trackByBarcode
+        ? processedCount !== item.returnedBarcodes.length + item.usedBarcodes.length || processedCount === 0 || processedCount > item.remainingQuantity
+        : processedCount !== item.remainingQuantity) {
         setError(
           `${item.barcode}: Return + Used must equal remaining quantity (${item.remainingQuantity}).`,
         );
@@ -412,6 +479,12 @@ export default function ServiceReturnPage() {
                     item.returnQuantity,
                   usedQuantity:
                     item.usedQuantity,
+                  ...(item.trackByBarcode
+                    ? {
+                        returnedBarcodes: item.returnedBarcodes,
+                        usedBarcodes: item.usedBarcodes,
+                      }
+                    : {}),
                 }),
               ),
             }),
@@ -894,10 +967,13 @@ export default function ServiceReturnPage() {
                 </h2>
 
                 <p className="mb-4 text-sm text-slate-500">
-                  Scan a product barcode or enter
-                  the product code from the Service
-                  Issue above.
+                  For issued unit-tracked products, scan each unit barcode and choose whether it is returned to stock or used. Quantity-based items can still be selected by product code.
                 </p>
+
+                <div className="mb-3 flex gap-2">
+                  <button type="button" onClick={() => setScanDisposition("RETURNED")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${scanDisposition === "RETURNED" ? "bg-emerald-600 text-white" : "border border-slate-200 text-slate-700"}`}>Return to Warehouse</button>
+                  <button type="button" onClick={() => setScanDisposition("USED")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${scanDisposition === "USED" ? "bg-orange-500 text-white" : "border border-slate-200 text-slate-700"}`}>Used / Sold</button>
+                </div>
 
                 <div className="flex gap-2">
                   <input
@@ -917,7 +993,7 @@ export default function ServiceReturnPage() {
                       }
                     }}
                     autoFocus
-                    placeholder="Scan product barcode..."
+                    placeholder="Scan issued unit barcode or product code..."
                     className="flex-1 rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                   />
 
@@ -991,9 +1067,13 @@ export default function ServiceReturnPage() {
                               className="border-b border-slate-100"
                             >
                               <td className="px-3 py-3 font-semibold">
-                                {
-                                  item.barcode
-                                }
+                                {item.barcode}
+                                {item.trackByBarcode && (
+                                  <div className="mt-1 max-w-sm text-xs font-normal text-slate-500">
+                                    <div>Returned: {item.returnedBarcodes.join(", ") || "—"}</div>
+                                    <div>Used: {item.usedBarcodes.join(", ") || "—"}</div>
+                                  </div>
+                                )}
                               </td>
 
                               <td className="px-3 py-3">
@@ -1003,13 +1083,13 @@ export default function ServiceReturnPage() {
                               </td>
 
                               <td className="px-3 py-3 font-semibold">
-                                {
-                                  item.remainingQuantity
-                                }
+                                {item.trackByBarcode
+                                  ? item.remainingQuantity - item.returnQuantity - item.usedQuantity
+                                  : item.remainingQuantity}
                               </td>
 
                               <td className="px-3 py-3">
-                                <input
+                                {item.trackByBarcode ? <span className="font-semibold text-emerald-700">{item.returnQuantity}</span> : <input
                                   type="number"
                                   min={0}
                                   max={
@@ -1032,11 +1112,11 @@ export default function ServiceReturnPage() {
                                     )
                                   }
                                   className="w-24 rounded-lg border border-slate-300 px-3 py-2"
-                                />
+                                />}
                               </td>
 
                               <td className="px-3 py-3">
-                                <input
+                                {item.trackByBarcode ? <span className="font-semibold text-orange-600">{item.usedQuantity}</span> : <input
                                   type="number"
                                   min={0}
                                   max={
@@ -1059,7 +1139,7 @@ export default function ServiceReturnPage() {
                                     )
                                   }
                                   className="w-24 rounded-lg border border-slate-300 px-3 py-2"
-                                />
+                                />}
                               </td>
 
                               <td className="px-3 py-3">
