@@ -3,6 +3,7 @@
 import {
   FormEvent,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -86,6 +87,8 @@ export default function ProductsPage() {
 
   const [showForm, setShowForm] =
     useState(false);
+
+  const formSectionRef = useRef<HTMLElement | null>(null);
 
   const [editingProduct, setEditingProduct] =
     useState<Product | null>(null);
@@ -187,6 +190,15 @@ export default function ProductsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+
+    formSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [showForm, editingProduct?.id]);
 
   function openCreateForm() {
     setEditingProduct(null);
@@ -696,7 +708,7 @@ async function handleToggleProductStatus(
 
       {/* Form */}
       {showForm && (
-        <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section ref={formSectionRef} className="mb-8 scroll-mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
             <div>
