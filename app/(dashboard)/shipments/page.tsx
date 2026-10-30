@@ -3,6 +3,7 @@
 import {
   FormEvent,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import Link from "next/link";
@@ -123,6 +124,25 @@ export default function ShipmentsPage() {
 
   const [serialNumbers, setSerialNumbers] =
     useState<string[]>([]);
+
+  const warrantyReminderShipments = useMemo(() => {
+    const groups = new Map<string, { shipmentId: string; shipmentNo: string; dealerCode: string; dealerName: string; shipmentDate: string; reminderDays: number; warrantyEnd: string; serials: WarrantyExtensionReminder[] }>();
+    for (const reminder of warrantyExtensionReminders) {
+      const group = groups.get(reminder.shipmentId) ?? {
+        shipmentId: reminder.shipmentId,
+        shipmentNo: reminder.shipmentNo,
+        dealerCode: reminder.dealerCode,
+        dealerName: reminder.dealerName,
+        shipmentDate: reminder.shipmentDate,
+        reminderDays: reminder.reminderDays,
+        warrantyEnd: reminder.warrantyEnd,
+        serials: [],
+      };
+      group.serials.push(reminder);
+      groups.set(reminder.shipmentId, group);
+    }
+    return [...groups.values()].sort((a, b) => a.warrantyEnd.localeCompare(b.warrantyEnd));
+  }, [warrantyExtensionReminders]);
 
   function getTodayDate() {
     const today = new Date();
@@ -928,13 +948,13 @@ export default function ShipmentsPage() {
         {/* Shipment List */}
         <section className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 px-5 py-4">
-            <div><h2 className="font-bold text-amber-950">G/H Stock Warranty Reminders</h2><p className="mt-1 text-xs text-amber-900">Shipment တစ်ခုချင်းစီတွင် သတ်မှတ်ထားသော ကြိုတင်ရက်အတွင်း ရောက်လာသည့် Reminder များ</p></div>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800">{warrantyExtensionReminders.length} serial(s)</span>
+            <div><h2 className="font-bold text-amber-950">G/H Stock Warranty Reminders</h2><p className="mt-1 text-xs text-amber-900">Shipment နဲ့ ရက်စွဲအလိုက် အုပ်စုဖွဲ့ပြထားသည်။ မတိုးရသေးသော G/H serial များသာ ပါသည်။</p></div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800">{warrantyReminderShipments.length} Shipment · {warrantyExtensionReminders.length} serial</span>
           </div>
-          {warrantyExtensionReminders.length === 0 ? <p className="px-5 py-4 text-sm text-slate-600">လက်ရှိ Reminder ရောက်နေသော G/H stock မရှိပါ။</p> : <div className="divide-y divide-amber-100">
-            {warrantyExtensionReminders.map((reminder) => <div key={reminder.serialNumber} className="flex flex-wrap items-center justify-between gap-3 bg-white/70 px-5 py-3">
-              <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{reminder.dealerCode} · {reminder.dealerName} · {reminder.shipmentNo}</p><p className="mt-1 font-mono text-xs font-bold text-slate-700">{reminder.serialNumber} <span className="font-sans text-slate-500">· Policy {reminder.policyCode} · {reminder.productName}</span></p><p className="mt-1 text-[11px] text-amber-800">{reminder.reminderDays} ရက်ကြို Reminder · သက်တမ်းကုန်ရက် {new Date(reminder.warrantyEnd).toLocaleDateString("my-MM")}</p></div>
-              <Link href={`/shipments/${reminder.shipmentId}`} className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100">Shipment ထိန်းရန်</Link>
+          {warrantyReminderShipments.length === 0 ? <p className="px-5 py-4 text-sm text-slate-600">လက်ရှိ Reminder ရောက်နေသော G/H stock မရှိပါ။</p> : <div className="divide-y divide-amber-100">
+            {warrantyReminderShipments.map((shipment) => <div key={shipment.shipmentId} className="flex flex-wrap items-center justify-between gap-3 bg-white/70 px-5 py-4">
+              <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{shipment.shipmentNo} · {shipment.dealerCode} · {shipment.dealerName}</p><p className="mt-1 text-xs text-amber-800">Shipment ရက် {new Date(shipment.shipmentDate).toLocaleDateString("my-MM")} · {shipment.reminderDays} ရက်ကြို · ပထမနှစ်ကုန်ရက် {new Date(shipment.warrantyEnd).toLocaleDateString("my-MM")}</p><div className="mt-2 flex flex-wrap gap-1.5">{shipment.serials.map((reminder) => <span key={reminder.serialNumber} className="rounded-md bg-amber-100 px-2 py-1 font-mono text-[11px] text-amber-950" title={`${reminder.policyCode} · ${reminder.productName}`}>{reminder.serialNumber}</span>)}</div></div>
+              <Link href={`/shipments/${shipment.shipmentId}`} className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100">ဒီ Shipment စစ်ရန်</Link>
             </div>)}
           </div>}
         </section>

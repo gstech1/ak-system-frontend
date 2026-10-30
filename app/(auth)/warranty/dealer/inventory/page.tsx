@@ -37,6 +37,8 @@ type Unit = {
   productName: string | null;
   modelCode: string | null;
   shipmentNo: string | null;
+  shipmentId: string | null;
+  dealerPurchaseDate?: string | null;
   warrantyPolicyCode: string | null;
   extensionReminderDays?: number;
   extensionReminderAt?: string | null;
@@ -97,7 +99,7 @@ export default function DealerDashboardPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"ALL" | "STOCK" | "WARRANTY">("ALL");
-  const [selectedExtensionSerials, setSelectedExtensionSerials] = useState<string[]>([]);
+  const [selectedExtensionSerials, setSelectedExtensionSerials] = useState<Record<string, string[]>>({});
   const [extensionNote, setExtensionNote] = useState("");
   const [extensionBusy, setExtensionBusy] = useState(false);
   const [extensionMessage, setExtensionMessage] = useState("");
@@ -156,20 +158,21 @@ export default function DealerDashboardPage() {
     router.replace("/warranty/dealer-login");
   }
 
-  async function submitExtensionRequest() {
-    if (!auth?.accessToken || selectedExtensionSerials.length === 0) return;
+  async function submitExtensionRequest(shipmentId: string) {
+    const serialNumbers = selectedExtensionSerials[shipmentId] ?? [];
+    if (!auth?.accessToken || serialNumbers.length === 0) return;
     setExtensionBusy(true);
     setExtensionMessage("");
     try {
       const response = await fetch(`${API_BASE_URL}/warranty/dealer/extension-requests`, {
         method: "POST",
         headers: { Authorization: `Bearer ${auth.accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ serialNumbers: selectedExtensionSerials, dealerNote: extensionNote }),
+        body: JSON.stringify({ serialNumbers, dealerNote: extensionNote }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(Array.isArray(data?.message) ? data.message.join(" ") : data?.message || "တောင်းဆိုမှု မပို့နိုင်ပါ။");
-      setExtensionMessage(`Serial ${data.count} လုံးအတွက် သက်တမ်းတိုးတောင်းဆိုမှု ပို့ပြီးပါပြီ။ ဝန်ထမ်းစစ်ဆေးမှုကို စောင့်ပါ။`);
-      setSelectedExtensionSerials([]);
+      setExtensionMessage(`${data.count} serial ပါသော Shipment သက်တမ်းတိုးတောင်းဆိုမှုကို ပို့ပြီးပါပြီ။ ဝန်ထမ်းစစ်ဆေးမှုကို စောင့်ပါ။`);
+      setSelectedExtensionSerials((current) => ({ ...current, [shipmentId]: [] }));
       setExtensionNote("");
       await loadOverview(auth.accessToken);
     } catch (err) {
@@ -203,6 +206,22 @@ export default function DealerDashboardPage() {
       groups.set(key, group);
     }
     return [...groups.values()];
+  }, [filteredUnits]);
+
+  const extensionGroups = useMemo(() => {
+    const groups = new Map<string, { shipmentId: string; shipmentNo: string; shipmentDate: string | null; units: Unit[] }>();
+    for (const unit of filteredUnits) {
+      if (!unit.canRequestWarrantyExtension || !unit.shipmentId) continue;
+      const group = groups.get(unit.shipmentId) ?? {
+        shipmentId: unit.shipmentId,
+        shipmentNo: unit.shipmentNo || "Shipment",
+        shipmentDate: unit.dealerPurchaseDate ?? null,
+        units: [],
+      };
+      group.units.push(unit);
+      groups.set(unit.shipmentId, group);
+    }
+    return [...groups.values()].sort((a, b) => (a.shipmentDate || "").localeCompare(b.shipmentDate || ""));
   }, [filteredUnits]);
 
   if (checkingAuth) {
@@ -287,13 +306,28 @@ export default function DealerDashboardPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-4">
-              {filteredUnits.some((unit) => unit.canRequestWarrantyExtension) && (
+              {extensionGroups.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
                   <h3 className="text-sm font-bold text-amber-950">G/H ပစ္စည်း အာမခံ ၁ နှစ်တိုးရန်</h3>
-                  <p className="mt-1 text-xs leading-5 text-amber-900">ဆိုင်တွင် လက်ကျန်ရှိသော G/H serial များကိုသာ ရွေးတောင်းဆိုပါ။ ဝန်ထမ်းက စစ်ဆေးခွင့်ပြုပြီးမှသာ ၁ နှစ်တိုးမည်။</p>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <input value={extensionNote} onChange={(event) => setExtensionNote(event.target.value)} placeholder="မှတ်ချက် (မဖြစ်မနေမဟုတ်ပါ)" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400" />
-                    <button onClick={() => void submitExtensionRequest()} disabled={extensionBusy || selectedExtensionSerials.length === 0} className="h-10 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white disabled:opacity-50">{extensionBusy ? "ပို့နေသည်…" : `သက်တမ်းတိုးတောင်းရန် (${selectedExtensionSerials.length})`}</button>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">Shipment ရက်အလိုက် အစုလိုက်ရွေးနိုင်ပါတယ်။ ဆိုင်မှာ လက်ကျန်ရှိတဲ့ပစ္စည်းကိုသာ အမှန်ခြစ်ပြီး တောင်းဆိုပါ။ ဝန်ထမ်းက Shipment တစ်ခုလုံးကို တစ်ကြိမ်တည်း စစ်ဆေးခွင့်ပြုနိုင်ပါတယ်။</p>
+                  <div className="mt-3">
+                    <input value={extensionNote} onChange={(event) => setExtensionNote(event.target.value)} placeholder="မှတ်ချက် (မဖြစ်မနေမဟုတ်ပါ)" className="h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400" />
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {extensionGroups.map((group) => {
+                      const selected = selectedExtensionSerials[group.shipmentId] ?? [];
+                      const allSelected = group.units.length > 0 && selected.length === group.units.length;
+                      return <section key={group.shipmentId} className="rounded-xl border border-amber-200 bg-white p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div><p className="text-sm font-bold text-slate-800">{group.shipmentNo}</p><p className="mt-0.5 text-xs text-slate-500">Shipment ရက်: {formatDate(group.shipmentDate)} · {group.units.length} serial ရွေးနိုင်</p></div>
+                          <button type="button" onClick={() => setSelectedExtensionSerials((current) => ({ ...current, [group.shipmentId]: allSelected ? [] : group.units.map((unit) => unit.serialNumber) }))} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-900">{allSelected ? "အားလုံးဖြုတ်ရန်" : "ဒီ Shipment ထဲက အားလုံးရွေးရန်"}</button>
+                        </div>
+                        <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                          {group.units.map((unit) => <label key={unit.serialNumber} className="flex min-w-0 items-center gap-2 rounded-lg bg-amber-50/60 px-2.5 py-2 text-xs text-slate-700"><input type="checkbox" checked={selected.includes(unit.serialNumber)} onChange={(event) => setSelectedExtensionSerials((current) => { const values = current[group.shipmentId] ?? []; return { ...current, [group.shipmentId]: event.target.checked ? [...values, unit.serialNumber] : values.filter((value) => value !== unit.serialNumber) }; })} className="h-4 w-4 shrink-0 accent-amber-600" /><span className="truncate">{unit.productName || unit.productCode} · <span className="font-mono font-bold">{formatSerial(unit.serialNumber)}</span></span></label>)}
+                        </div>
+                        <div className="mt-3 flex justify-end"><button type="button" onClick={() => void submitExtensionRequest(group.shipmentId)} disabled={extensionBusy || selected.length === 0} className="h-10 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white disabled:opacity-50">{extensionBusy ? "ပို့နေသည်…" : `ရွေးထားသော ${selected.length} လုံး တောင်းရန်`}</button></div>
+                      </section>;
+                    })}
                   </div>
                 </div>
               )}
@@ -314,7 +348,6 @@ export default function DealerDashboardPage() {
                       const extension = unit.warrantyExtensionRequest;
                       return (
                         <article key={unit.serialNumber} className="flex items-start justify-between gap-3 px-3 py-3">
-                          {unit.canRequestWarrantyExtension && <input type="checkbox" aria-label={`${unit.serialNumber} ကို သက်တမ်းတိုးရန် ရွေးရန်`} checked={selectedExtensionSerials.includes(unit.serialNumber)} onChange={(event) => setSelectedExtensionSerials((current) => event.target.checked ? [...current, unit.serialNumber] : current.filter((value) => value !== unit.serialNumber))} className="mt-1 h-4 w-4 shrink-0 accent-amber-600" />}
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="font-mono text-sm font-bold tracking-wide text-slate-800">{formatSerial(unit.serialNumber)}</span>
