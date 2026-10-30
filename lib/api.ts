@@ -959,6 +959,7 @@ export interface Shipment {
   shipmentDate: string;
   status: string;
   remarks: string | null;
+  warrantyReminderDays?: number;
   createdAt: string;
   updatedAt: string;
   dealer?: {
@@ -967,6 +968,75 @@ export interface Shipment {
     companyName: string;
   };
   items?: ShipmentItem[];
+}
+
+export interface WarrantyExtensionReminder {
+  serialNumber: string;
+  dealerId: string;
+  dealerCode: string;
+  dealerName: string;
+  shipmentId: string;
+  shipmentNo: string;
+  shipmentDate: string;
+  policyCode: string | null;
+  productName: string | null;
+  reminderDays: number;
+  reminderAt: string;
+  warrantyEnd: string;
+}
+
+export interface WarrantyExtensionRequest {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  requestedAt: string;
+  dealerNote: string | null;
+  reviewNote: string | null;
+  dealer: { id: string; dealerCode: string; companyName: string };
+  items: { serial: { serialNumber: string; shipmentItem?: { shipment?: { id: string; shipmentNo: string } } } }[];
+}
+
+export async function getPendingWarrantyExtensionRequests(): Promise<WarrantyExtensionRequest[]> {
+  const response = await fetch(`${API_BASE_URL}/warranty/extension-requests?status=PENDING`, {
+    headers: { ...getAuthHeaders() }, cache: "no-store",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to load pending warranty extensions.");
+  }
+  return response.json();
+}
+
+export async function getWarrantyExtensionReminders(): Promise<WarrantyExtensionReminder[]> {
+  const response = await fetch(`${API_BASE_URL}/warranty/extension-reminders`, {
+    headers: { ...getAuthHeaders() }, cache: "no-store",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to load G/H warranty reminders.");
+  }
+  return response.json();
+}
+
+export async function getWarrantyExtensionRequestsForShipment(shipmentId: string): Promise<WarrantyExtensionRequest[]> {
+  const response = await fetch(`${API_BASE_URL}/warranty/extension-requests?shipmentId=${encodeURIComponent(shipmentId)}`, {
+    headers: { ...getAuthHeaders() }, cache: "no-store",
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to load warranty extension requests.");
+  }
+  return response.json();
+}
+
+export async function reviewWarrantyExtensionRequest(id: string, approved: boolean): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/warranty/extension-requests/${encodeURIComponent(id)}/review`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ approved }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to review warranty extension.");
+  }
 }
 
 export interface ShipmentItem {
@@ -1107,6 +1177,7 @@ export interface CreateShipmentInput {
   dealerId: string;
   shipmentDate: string;
   remarks?: string;
+  warrantyReminderDays?: number;
 }
 
 export interface UpdateShipmentInput {
@@ -1114,6 +1185,20 @@ export interface UpdateShipmentInput {
   dealerId?: string;
   shipmentDate?: string;
   remarks?: string;
+  warrantyReminderDays?: number;
+}
+
+export async function updateShipmentWarrantyReminderDays(id: string, warrantyReminderDays: number): Promise<Shipment> {
+  const response = await fetch(`${API_BASE_URL}/shipments/${encodeURIComponent(id)}/warranty-reminder`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ warrantyReminderDays }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to update shipment reminder.");
+  }
+  return response.json();
 }
 
 export interface CreateShipmentItemInput {

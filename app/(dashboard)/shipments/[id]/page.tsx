@@ -10,9 +10,13 @@ import PageTitle from "@/components/common/PageTitle";
 import {
   assignShipmentSerials,
   getShipment,
+  getWarrantyExtensionRequestsForShipment,
+  reviewWarrantyExtensionRequest,
+  updateShipmentWarrantyReminderDays,
   type Product,
   type Shipment,
   type ShipmentSerial,
+  type WarrantyExtensionRequest,
 } from "@/lib/api";
 import { printThermalReceipt } from "@/lib/thermalReceipt";
 
@@ -118,6 +122,10 @@ export default function ShipmentDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [reminderDays, setReminderDays] = useState(30);
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [extensionRequests, setExtensionRequests] = useState<WarrantyExtensionRequest[]>([]);
+  const [reviewingExtension, setReviewingExtension] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -126,8 +134,15 @@ export default function ShipmentDetailsPage() {
       try {
         setLoading(true);
         setError("");
-        const data = await getShipment(shipmentId);
-        if (!cancelled) setShipment(data);
+        const [data, requests] = await Promise.all([
+          getShipment(shipmentId),
+          getWarrantyExtensionRequestsForShipment(shipmentId),
+        ]);
+        if (!cancelled) {
+          setShipment(data);
+          setReminderDays(data.warrantyReminderDays ?? 30);
+          setExtensionRequests(requests);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -146,6 +161,38 @@ export default function ShipmentDetailsPage() {
       cancelled = true;
     };
   }, [shipmentId]);
+
+  async function decideExtensionRequest(request: WarrantyExtensionRequest, approved: boolean) {
+    const action = approved ? "ခွင့်ပြု" : "ပယ်ချ";
+    if (!window.confirm(`${request.items.length} serial ပါသော G/H သက်တမ်းတိုးတောင်းဆိုမှုကို ${action}မလား?`)) return;
+    try {
+      setReviewingExtension(request.id);
+      setError("");
+      await reviewWarrantyExtensionRequest(request.id, approved);
+      setExtensionRequests(await getWarrantyExtensionRequestsForShipment(shipmentId));
+      setSuccess(approved ? "G/H stock အာမခံတစ်နှစ်တိုးရန် ခွင့်ပြုပြီးပါပြီ။" : "သက်တမ်းတိုးတောင်းဆိုမှုကို ပယ်ချပြီးပါပြီ။");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "တောင်းဆိုမှုကို ဆုံးဖြတ်မရပါ။");
+    } finally {
+      setReviewingExtension("");
+    }
+  }
+
+  async function saveReminderDays() {
+    if (!shipment) return;
+    try {
+      setSavingReminder(true);
+      setError("");
+      setSuccess("");
+      const updated = await updateShipmentWarrantyReminderDays(shipment.id, reminderDays);
+      setShipment((current) => current ? { ...current, warrantyReminderDays: updated.warrantyReminderDays } : current);
+      setSuccess("G/H stock reminder ကို သိမ်းပြီးပါပြီ။");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reminder setting ကို သိမ်းမရပါ။");
+    } finally {
+      setSavingReminder(false);
+    }
+  }
 
   async function handleAssignSerials(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -287,6 +334,38 @@ export default function ShipmentDetailsPage() {
               </div>
               {shipment.remarks && (
                 <p className="mt-4 text-sm text-slate-600">Remarks: {shipment.remarks}</p>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="max-w-2xl">
+                  <h2 className="font-bold text-amber-950">G/H stock warranty reminder</h2>
+                  <p className="mt-1 text-sm leading-6 text-amber-900">ဒီ Shipment ထဲက G/H policy ပစ္စည်းများအတွက် ပထမနှစ်ကုန်ခါနီး Dealer နှင့် ဝန်ထမ်း dashboard နှစ်ဖက်လုံးတွင် သတိပေးမည့် ရက်အရေအတွက်ကို သတ်မှတ်ပါ။ Reminder ပေါ်ချိန်တွင် Dealer က တောင်းဆိုနိုင်ပြီး ဝန်ထမ်းက ဒီ Shipment မှ ဆက်စစ်အတည်ပြုနိုင်ပါသည်။</p>
+                </div>
+                <div className="flex shrink-0 items-end gap-2">
+                  <label className="text-xs font-semibold text-amber-950">ကြိုတင်ရက်
+                    <input type="number" min={0} max={365} value={reminderDays} onChange={(event) => setReminderDays(Number(event.target.value))} className="mt-1 block h-10 w-28 rounded-lg border border-amber-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-amber-500" />
+                  </label>
+                  <button type="button" onClick={() => void saveReminderDays()} disabled={savingReminder || reminderDays < 0 || reminderDays > 365} className="h-10 rounded-lg bg-amber-700 px-4 text-sm font-bold text-white disabled:opacity-50">{savingReminder ? "သိမ်းနေသည်…" : "သိမ်းမည်"}</button>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-amber-800">၀ ထည့်ပါက Reminder မပြပါ။ Dealer က ပထမနှစ်အတွင်း ကိုယ်တိုင်တောင်းဆိုနိုင်သေးသည်။ လက်ရှိသတ်မှတ်ချက်: {shipment.warrantyReminderDays ?? 30} ရက် ကြိုတင်</p>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><h2 className="font-bold text-slate-900">G/H သက်တမ်းတိုးတောင်းဆိုမှုများ</h2><p className="mt-1 text-xs text-slate-500">ဒီ Shipment ထဲက serial များအတွက် Dealer ပို့ထားသော တောင်းဆိုမှုစာရင်း</p></div>
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{extensionRequests.filter((request) => request.status === "PENDING").length} ဆိုင်းငံ့</span>
+              </div>
+              {extensionRequests.length === 0 ? <p className="mt-3 rounded-xl bg-slate-50 px-4 py-5 text-sm text-slate-500">တောင်းဆိုမှု မရှိသေးပါ။</p> : (
+                <div className="mt-3 space-y-3">
+                  {extensionRequests.map((request) => <article key={request.id} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-slate-800">{request.dealer.dealerCode} · {request.dealer.companyName}</p><p className="mt-0.5 text-xs text-slate-500">{new Date(request.requestedAt).toLocaleString()} · {request.items.length} serial(s)</p>{request.dealerNote && <p className="mt-1 text-xs text-slate-600">မှတ်ချက်: {request.dealerNote}</p>}</div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${request.status === "PENDING" ? "bg-amber-100 text-amber-800" : request.status === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>{request.status}</span></div>
+                    <div className="mt-3 flex flex-wrap gap-2">{request.items.map(({ serial }) => <span key={serial.serialNumber} className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-mono text-xs text-slate-700">{serial.serialNumber}</span>)}</div>
+                    {request.status === "PENDING" && <div className="mt-3 flex justify-end gap-2"><button type="button" disabled={Boolean(reviewingExtension)} onClick={() => void decideExtensionRequest(request, false)} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">ပယ်ချ</button><button type="button" disabled={Boolean(reviewingExtension)} onClick={() => void decideExtensionRequest(request, true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{reviewingExtension === request.id ? "သိမ်းနေသည်…" : "၁ နှစ်တိုးခွင့်ပြု"}</button></div>}
+                  </article>)}
+                </div>
               )}
             </section>
 

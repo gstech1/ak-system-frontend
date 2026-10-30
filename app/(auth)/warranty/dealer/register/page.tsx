@@ -22,6 +22,7 @@ type SerialPreview = {
   registrationDeadline: string | null;
   replacementLimit: number | null;
   dealerPurchaseDate: string | null;
+  customerSaleDate?: string | null;
   registrationRequired: boolean;
   registrationWindowExpired: boolean;
   canRegister: boolean;
@@ -51,8 +52,14 @@ function periodText(months: number) {
   return `${months} လ`;
 }
 
+function todayForDateInput() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
 export default function DealerWarrantyRegisterPage() {
   const [serialNumber, setSerialNumber] = useState("");
+  const [saleDate, setSaleDate] = useState(todayForDateInput);
   const [preview, setPreview] = useState<SerialPreview | null>(null);
   const [result, setResult] = useState<RegistrationResult | null>(null);
   const [checking, setChecking] = useState(false);
@@ -89,7 +96,7 @@ export default function DealerWarrantyRegisterPage() {
           window.location.href = "/warranty/dealer-login";
           return;
         }
-        const response = await fetch(`${API_BASE_URL}/warranty/dealer/register/preview/${encodeURIComponent(normalized)}`, {
+        const response = await fetch(`${API_BASE_URL}/warranty/dealer/register/preview/${encodeURIComponent(normalized)}?saleDate=${encodeURIComponent(saleDate)}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
@@ -107,7 +114,7 @@ export default function DealerWarrantyRegisterPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [serialNumber]);
+  }, [serialNumber, saleDate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +131,7 @@ export default function DealerWarrantyRegisterPage() {
       const response = await fetch(`${API_BASE_URL}/warranty/dealer/register`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ serialNumber: preview.serialNumber }),
+        body: JSON.stringify({ serialNumber: preview.serialNumber, saleDate }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(Array.isArray(data?.message) ? data.message.join(" ") : data?.message || "Warranty Register လုပ်မရပါ။");
@@ -154,6 +161,9 @@ export default function DealerWarrantyRegisterPage() {
               {preview?.canRegister && <button type="submit" disabled={submitting || checking} className="h-12 shrink-0 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Register…" : "Register"}</button>}
             </div>
             <p className="mt-1.5 text-xs text-slate-400">Barcode scanner ကို တန်းဖတ်နိုင်ပါတယ်။</p>
+            <label htmlFor="customer-sale-date" className="mt-4 block text-sm font-semibold text-slate-700">Customer ဝယ်ယူသည့်နေ့ <span className="font-normal text-slate-500">(G/H အတွက်)</span></label>
+            <input id="customer-sale-date" type="date" value={saleDate} max={todayForDateInput()} onChange={(event) => setSaleDate(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" />
+            <p className="mt-1 text-xs text-slate-400">G/H ပစ္စည်းတွင် အာမခံစတင်ရက်ကို Customer ဝယ်ယူသည့်နေ့အဖြစ် သတ်မှတ်မည်။</p>
           </form>
 
           {checking && <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500"><LoaderCircle size={17} className="animate-spin" /> Serial အချက်အလက် စစ်ဆေးနေသည်…</div>}
@@ -166,6 +176,7 @@ export default function DealerWarrantyRegisterPage() {
               {preview.policyName && <InfoRow label="Warranty Policy" value={`${preview.policyCode ? `${preview.policyCode} — ` : ""}${preview.policyName}`} />}
               <InfoRow label="Warranty စတင်ချိန်" value={startRuleText(preview.startRule)} />
               <InfoRow label="Warranty ကာလ" value={periodText(preview.warrantyMonths)} />
+              {(preview.policyCode === "G" || preview.policyCode === "H") && <InfoRow label="Customer ဝယ်ယူသည့်နေ့" value={dateText(preview.customerSaleDate)} />}
               {preview.registrationRequired && preview.registrationDeadlineMonths && <InfoRow label="Dealer ဝယ်ယူပြီး Register လုပ်ရန်ကာလ" value={`${preview.registrationDeadlineMonths} လအတွင်း${preview.registrationDeadline ? ` · ${dateText(preview.registrationDeadline)} နောက်ဆုံး` : ""}`} />}
               <InfoRow label="အစားထိုးခွင့်" value={preview.replacementLimit == null ? "အကန့်အသတ်မရှိ" : `${preview.replacementLimit} ကြိမ်`} />
               <InfoRow label="အာမခံစတင်ရက်" value={dateText(preview.warrantyStart)} />

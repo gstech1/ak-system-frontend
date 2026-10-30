@@ -19,12 +19,21 @@ type RegistrationReminder = {
   registrationDeadline: string;
   daysRemaining: number;
 };
+type WarrantyExtensionReminder = {
+  serialNumber: string;
+  productName: string | null;
+  shipmentNo: string | null;
+  reminderAt: string;
+  warrantyEnd: string;
+  reminderDays: number;
+};
 
 export default function DealerDashboardPage() {
   const router = useRouter();
   const [auth, setAuth] = useState<DealerAuth | null>(null);
   const [checking, setChecking] = useState(true);
   const [registrationReminders, setRegistrationReminders] = useState<RegistrationReminder[]>([]);
+  const [extensionReminders, setExtensionReminders] = useState<WarrantyExtensionReminder[]>([]);
 
   useEffect(() => {
     try {
@@ -61,6 +70,9 @@ export default function DealerDashboardPage() {
       if (!cancelled && Array.isArray(data?.registrationReminders)) {
         setRegistrationReminders(data.registrationReminders);
       }
+      if (!cancelled && Array.isArray(data?.warrantyExtensionReminders)) {
+        setExtensionReminders(data.warrantyExtensionReminders);
+      }
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [auth]);
@@ -90,12 +102,25 @@ export default function DealerDashboardPage() {
         {registrationReminders.length > 0 && <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm" aria-label="Warranty registration reminders">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><AlertTriangle size={21} /></div>
-            <div className="min-w-0 flex-1"><h2 className="font-bold text-amber-900">Warranty သက်တမ်းတိုးရန် သတိပေးချက်</h2><p className="mt-1 text-xs leading-5 text-amber-800">Dealer ဝယ်ယူပြီး ၁ နှစ်မပြည့်မီ Register လုပ်ပေးပါ။ မလုပ်ပါက ဒီ serial ကို သတ်မှတ်ရက်ကျော်ပြီး Register လုပ်၍မရနိုင်ပါ။</p></div>
+            <div className="min-w-0 flex-1"><h2 className="font-bold text-amber-900">Customer Warranty Register သတိပေးချက်</h2><p className="mt-1 text-xs leading-5 text-amber-800">Dealer ထံမှဝယ်ယူပြီး ၁ နှစ်မပြည့်မီ Customer အမည်ဖြင့် Register လုပ်ပေးပါ။</p></div>
           </div>
           <div className="mt-3 space-y-2">
             {registrationReminders.map((item) => <div key={item.serialNumber} className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-white p-3">
               <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-700">{item.productName || item.productCode || "Product"}</p><p className="mt-0.5 font-mono text-sm font-bold text-slate-900">{item.serialNumber}</p><p className="mt-0.5 text-[11px] text-amber-800">{item.daysRemaining < 0 ? "Register သတ်မှတ်ရက် ကျော်လွန်ပါပြီ" : `Register လုပ်ရန် ${item.daysRemaining} ရက်သာ ကျန်ပါသည်`} · နောက်ဆုံးရက် ${new Date(item.registrationDeadline).toLocaleDateString("my-MM")}</p></div>
               {item.daysRemaining >= 0 && <Link href={`/warranty/dealer/register?serial=${encodeURIComponent(item.serialNumber)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">Register</Link>}
+            </div>)}
+          </div>
+        </section>}
+
+        {extensionReminders.length > 0 && <section className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 shadow-sm" aria-label="G/H stock warranty extension reminders">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700"><AlertTriangle size={21} /></div>
+            <div className="min-w-0 flex-1"><h2 className="font-bold text-orange-950">G/H လက်ကျန်ပစ္စည်း အာမခံတိုးရန် Reminder</h2><p className="mt-1 text-xs leading-5 text-orange-900">အောက်ပါ G/H ပစ္စည်းများ၏ ပထမနှစ်ကုန်ခါနီးပါပြီ။ ဆိုင်မှာရှိနေသေးသော serial များကို ရွေးပြီး တောင်းဆိုပါ။ ဝန်ထမ်းခွင့်ပြုမှသာ နောက်ထပ် ၁ နှစ်တိုးမည်။</p></div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {extensionReminders.map((item) => <div key={item.serialNumber} className="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-white p-3">
+              <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-700">{item.productName || "G/H Product"} · {item.shipmentNo}</p><p className="mt-0.5 font-mono text-sm font-bold text-slate-900">{item.serialNumber}</p><p className="mt-0.5 text-[11px] text-orange-800">Reminder: {new Date(item.reminderAt).toLocaleDateString("my-MM")} · ပထမနှစ်ကုန်ရက်: {new Date(item.warrantyEnd).toLocaleDateString("my-MM")}</p></div>
+              <Link href="/warranty/dealer/inventory" className="shrink-0 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white">တောင်းဆိုရန်</Link>
             </div>)}
           </div>
         </section>}

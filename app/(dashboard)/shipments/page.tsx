@@ -20,6 +20,10 @@ import {
   getSuntreeServiceIssues,
   createSuntreeServiceIssue,
   completeSuntreeServiceIssue,
+  getWarrantyExtensionReminders,
+  getPendingWarrantyExtensionRequests,
+  type WarrantyExtensionReminder,
+  type WarrantyExtensionRequest,
   type Shipment,
   type SuntreeServiceIssue,
 } from "@/lib/api";
@@ -52,6 +56,8 @@ export default function ShipmentsPage() {
     useState<Shipment[]>([]);
   const [serviceIssues, setServiceIssues] =
     useState<SuntreeServiceIssue[]>([]);
+  const [warrantyExtensionReminders, setWarrantyExtensionReminders] = useState<WarrantyExtensionReminder[]>([]);
+  const [pendingWarrantyExtensionRequests, setPendingWarrantyExtensionRequests] = useState<WarrantyExtensionRequest[]>([]);
   const [listMode, setListMode] = useState<"SALES" | "SERVICE" | "RETURN">("SALES");
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [showReturnPanel, setShowReturnPanel] = useState(false);
@@ -110,6 +116,8 @@ export default function ShipmentsPage() {
   const [remarks, setRemarks] =
     useState("");
 
+  const [warrantyReminderDays, setWarrantyReminderDays] = useState(30);
+
   const [scanSerial, setScanSerial] =
     useState("");
 
@@ -161,6 +169,8 @@ export default function ShipmentsPage() {
         shipmentResponse,
         serviceIssueResponse,
         dealerResponse,
+        reminderResponse,
+        extensionRequestResponse,
       ] = await Promise.all([
         getShipments(),
         getSuntreeServiceIssues(),
@@ -171,6 +181,8 @@ export default function ShipmentsPage() {
           },
           cache: "no-store",
         }),
+        getWarrantyExtensionReminders().catch(() => []),
+        getPendingWarrantyExtensionRequests().catch(() => []),
       ]);
 
       const dealerData =
@@ -187,6 +199,8 @@ export default function ShipmentsPage() {
 
       setShipments(shipmentResponse);
       setServiceIssues(serviceIssueResponse);
+      setWarrantyExtensionReminders(reminderResponse);
+      setPendingWarrantyExtensionRequests(extensionRequestResponse);
 
       setDealers(
         Array.isArray(dealerData)
@@ -217,6 +231,7 @@ export default function ShipmentsPage() {
       getTodayDate(),
     );
     setRemarks("");
+    setWarrantyReminderDays(30);
     setScanSerial("");
     setSerialNumbers([]);
   }
@@ -442,6 +457,7 @@ export default function ShipmentsPage() {
         shipmentDate,
         remarks:
           remarks.trim() || undefined,
+        warrantyReminderDays,
         serialNumbers,
       });
 
@@ -826,6 +842,12 @@ export default function ShipmentsPage() {
                 />
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">G/H warranty Reminder (ရက်)</label>
+                <input type="number" min={0} max={365} value={warrantyReminderDays} onChange={(event) => setWarrantyReminderDays(Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-300 px-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+                <p className="mt-1 text-xs text-slate-500">ပထမနှစ်ကုန်မည့်ရက်မတိုင်ခင် ဘယ်နှရက်မှာ Dealer နှင့် ဝန်ထမ်းကို သတိပေးမည်။ ၀ = ပိတ်ထားမည်။</p>
+              </div>
+
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Scan / Enter Serial Barcodes
@@ -904,6 +926,35 @@ export default function ShipmentsPage() {
         )}
 
         {/* Shipment List */}
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 px-5 py-4">
+            <div><h2 className="font-bold text-amber-950">G/H Stock Warranty Reminders</h2><p className="mt-1 text-xs text-amber-900">Shipment တစ်ခုချင်းစီတွင် သတ်မှတ်ထားသော ကြိုတင်ရက်အတွင်း ရောက်လာသည့် Reminder များ</p></div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800">{warrantyExtensionReminders.length} serial(s)</span>
+          </div>
+          {warrantyExtensionReminders.length === 0 ? <p className="px-5 py-4 text-sm text-slate-600">လက်ရှိ Reminder ရောက်နေသော G/H stock မရှိပါ။</p> : <div className="divide-y divide-amber-100">
+            {warrantyExtensionReminders.map((reminder) => <div key={reminder.serialNumber} className="flex flex-wrap items-center justify-between gap-3 bg-white/70 px-5 py-3">
+              <div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{reminder.dealerCode} · {reminder.dealerName} · {reminder.shipmentNo}</p><p className="mt-1 font-mono text-xs font-bold text-slate-700">{reminder.serialNumber} <span className="font-sans text-slate-500">· Policy {reminder.policyCode} · {reminder.productName}</span></p><p className="mt-1 text-[11px] text-amber-800">{reminder.reminderDays} ရက်ကြို Reminder · သက်တမ်းကုန်ရက် {new Date(reminder.warrantyEnd).toLocaleDateString("my-MM")}</p></div>
+              <Link href={`/shipments/${reminder.shipmentId}`} className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100">Shipment ထိန်းရန်</Link>
+            </div>)}
+          </div>}
+        </section>
+
+        {pendingWarrantyExtensionRequests.length > 0 && <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-200 px-5 py-4">
+            <div><h2 className="font-bold text-emerald-950">G/H သက်တမ်းတိုးခွင့်ပြုရန် စောင့်နေသောစာရင်း</h2><p className="mt-1 text-xs text-emerald-900">Dealer ကတောင်းဆိုထားသော serial များကို Shipment ထဲမှဖွင့်ပြီး ခွင့်ပြု/ပယ်ချပါ။</p></div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-800">{pendingWarrantyExtensionRequests.length} တောင်းဆိုမှု</span>
+          </div>
+          <div className="divide-y divide-emerald-100">
+            {pendingWarrantyExtensionRequests.map((request) => {
+              const shipment = request.items[0]?.serial.shipmentItem?.shipment;
+              return <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 bg-white/70 px-5 py-3">
+                <div><p className="text-sm font-semibold text-slate-800">{request.dealer.dealerCode} · {request.dealer.companyName} · {shipment?.shipmentNo || "Shipment"}</p><p className="mt-1 text-xs text-slate-600">{request.items.length} serial(s): {request.items.map(({ serial }) => serial.serialNumber).join(", ")}</p><p className="mt-1 text-[11px] text-slate-500">တောင်းဆိုချိန် {new Date(request.requestedAt).toLocaleString()}</p></div>
+                {shipment && <Link href={`/shipments/${request.items[0].serial.shipmentItem?.shipment?.id}`} className="shrink-0 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100">Shipment မှ စစ်ရန်</Link>}
+              </div>;
+            })}
+          </div>
+        </section>}
+
         <section id="stock-out-list" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4">

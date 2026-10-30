@@ -38,6 +38,11 @@ type Unit = {
   modelCode: string | null;
   shipmentNo: string | null;
   warrantyPolicyCode: string | null;
+  extensionReminderDays?: number;
+  extensionReminderAt?: string | null;
+  isWarrantyExtensionReminderDue?: boolean;
+  canRequestWarrantyExtension?: boolean;
+  warrantyExtensionRequest?: { id: string; status: "PENDING" | "APPROVED" | "REJECTED"; requestedAt: string; reviewedAt: string | null; reviewNote: string | null; extendedEnd: string | null } | null;
   replacementForSerialNumber: string | null;
   warranty: null | {
     warrantyNo: string | null;
@@ -59,6 +64,7 @@ type Overview = {
     activeWarrantyCount: number;
     expiringSoonCount: number;
     replacementCount: number;
+    warrantyExtensionReminderCount?: number;
   };
   units: Unit[];
 };
@@ -91,6 +97,10 @@ export default function DealerDashboardPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"ALL" | "STOCK" | "WARRANTY">("ALL");
+  const [selectedExtensionSerials, setSelectedExtensionSerials] = useState<string[]>([]);
+  const [extensionNote, setExtensionNote] = useState("");
+  const [extensionBusy, setExtensionBusy] = useState(false);
+  const [extensionMessage, setExtensionMessage] = useState("");
 
   useEffect(() => {
     try {
@@ -144,6 +154,29 @@ export default function DealerDashboardPage() {
   function handleLogout() {
     localStorage.removeItem("dealerAuth");
     router.replace("/warranty/dealer-login");
+  }
+
+  async function submitExtensionRequest() {
+    if (!auth?.accessToken || selectedExtensionSerials.length === 0) return;
+    setExtensionBusy(true);
+    setExtensionMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/warranty/dealer/extension-requests`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${auth.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ serialNumbers: selectedExtensionSerials, dealerNote: extensionNote }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(Array.isArray(data?.message) ? data.message.join(" ") : data?.message || "တောင်းဆိုမှု မပို့နိုင်ပါ။");
+      setExtensionMessage(`Serial ${data.count} လုံးအတွက် သက်တမ်းတိုးတောင်းဆိုမှု ပို့ပြီးပါပြီ။ ဝန်ထမ်းစစ်ဆေးမှုကို စောင့်ပါ။`);
+      setSelectedExtensionSerials([]);
+      setExtensionNote("");
+      await loadOverview(auth.accessToken);
+    } catch (err) {
+      setExtensionMessage(err instanceof Error ? err.message : "တောင်းဆိုမှု မပို့နိုင်ပါ။");
+    } finally {
+      setExtensionBusy(false);
+    }
   }
 
   const filteredUnits = useMemo(() => {
@@ -243,6 +276,7 @@ export default function DealerDashboardPage() {
           </div>
 
           {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {extensionMessage && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{extensionMessage}</div>}
           {loading ? (
             <div className="py-12 text-center text-sm text-slate-500">စာရင်းဖတ်နေသည်…</div>
           ) : !error && groupedUnits.length === 0 ? (
@@ -253,6 +287,16 @@ export default function DealerDashboardPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-4">
+              {filteredUnits.some((unit) => unit.canRequestWarrantyExtension) && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:p-4">
+                  <h3 className="text-sm font-bold text-amber-950">G/H ပစ္စည်း အာမခံ ၁ နှစ်တိုးရန်</h3>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">ဆိုင်တွင် လက်ကျန်ရှိသော G/H serial များကိုသာ ရွေးတောင်းဆိုပါ။ ဝန်ထမ်းက စစ်ဆေးခွင့်ပြုပြီးမှသာ ၁ နှစ်တိုးမည်။</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input value={extensionNote} onChange={(event) => setExtensionNote(event.target.value)} placeholder="မှတ်ချက် (မဖြစ်မနေမဟုတ်ပါ)" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400" />
+                    <button onClick={() => void submitExtensionRequest()} disabled={extensionBusy || selectedExtensionSerials.length === 0} className="h-10 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white disabled:opacity-50">{extensionBusy ? "ပို့နေသည်…" : `သက်တမ်းတိုးတောင်းရန် (${selectedExtensionSerials.length})`}</button>
+                  </div>
+                </div>
+              )}
               {groupedUnits.map((group) => (
                 <section key={group.key} className="overflow-hidden rounded-xl border border-slate-200">
                   <div className="flex items-center justify-between gap-3 bg-slate-50 px-3 py-2.5">
@@ -267,8 +311,10 @@ export default function DealerDashboardPage() {
                     {group.units.map((unit) => {
                       const isStock = isDealerStock(unit);
                       const latestRequest = unit.replacementRequests[0];
+                      const extension = unit.warrantyExtensionRequest;
                       return (
                         <article key={unit.serialNumber} className="flex items-start justify-between gap-3 px-3 py-3">
+                          {unit.canRequestWarrantyExtension && <input type="checkbox" aria-label={`${unit.serialNumber} ကို သက်တမ်းတိုးရန် ရွေးရန်`} checked={selectedExtensionSerials.includes(unit.serialNumber)} onChange={(event) => setSelectedExtensionSerials((current) => event.target.checked ? [...current, unit.serialNumber] : current.filter((value) => value !== unit.serialNumber))} className="mt-1 h-4 w-4 shrink-0 accent-amber-600" />}
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="font-mono text-sm font-bold tracking-wide text-slate-800">{formatSerial(unit.serialNumber)}</span>
@@ -287,6 +333,8 @@ export default function DealerDashboardPage() {
                                 Replacement {latestRequest.returnNo} · {latestRequest.status.replaceAll("_", " ")}
                               </p>
                             )}
+                            {extension && <p className={`mt-1 text-[10px] font-semibold ${extension.status === "APPROVED" ? "text-emerald-700" : extension.status === "PENDING" ? "text-amber-700" : "text-rose-700"}`}>{extension.status === "APPROVED" ? `၁ နှစ်သက်တမ်းတိုးပြီး · ${formatDate(extension.extendedEnd)}` : extension.status === "PENDING" ? "သက်တမ်းတိုးတောင်းဆိုမှု စစ်ဆေးဆဲ" : `သက်တမ်းတိုးရန် ပယ်ချထား${extension.reviewNote ? ` · ${extension.reviewNote}` : ""}`}</p>}
+                            {unit.isWarrantyExtensionReminderDue && <p className="mt-1 text-[10px] font-bold text-amber-700">၁ နှစ်သက်တမ်းတိုးရန် Reminder · {formatDate(unit.extensionReminderAt)} ကတည်းက</p>}
                           </div>
                           {unit.shipmentNo && <span className="shrink-0 pt-0.5 text-[10px] text-slate-400">{unit.shipmentNo}</span>}
                         </article>
