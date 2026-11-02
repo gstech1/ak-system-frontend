@@ -11,6 +11,7 @@ import {
   createProduct,
   createProductOption,
   deleteProduct,
+  getProduct,
   getProducts,
   getWarrantyPolicies,
   getProductOptions,
@@ -89,6 +90,7 @@ export default function ProductsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
   const [showForm, setShowForm] =
     useState(false);
@@ -220,12 +222,27 @@ export default function ProductsPage() {
     setShowForm(true);
   }
 
-  function openEditForm(product: Product) {
-    setEditingProduct(product);
-    setForm(productToForm(product));
+  async function openEditForm(product: Product) {
+    setLoadingEditId(product.id);
     setError("");
     setSuccess("");
-    setShowForm(true);
+
+    try {
+      // Fetch the full, current record before opening the form. The list payload
+      // can be stale or omit optional attributes, which would make selects look blank.
+      const currentProduct = await getProduct(product.id);
+      setEditingProduct(currentProduct);
+      setForm(productToForm(currentProduct));
+      setShowForm(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Product အချက်အလက် မရယူနိုင်ပါ: ${err.message}`
+          : "Product အချက်အလက် မရယူနိုင်ပါ။",
+      );
+    } finally {
+      setLoadingEditId(null);
+    }
   }
 
   function closeForm() {
@@ -1295,9 +1312,10 @@ async function handleToggleProductStatus(
       onClick={() =>
         openEditForm(product)
       }
+      disabled={loadingEditId === product.id}
       className="rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
     >
-      Edit
+      {loadingEditId === product.id ? "Loading…" : "Edit"}
     </button>
 
     <button
