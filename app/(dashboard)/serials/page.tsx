@@ -14,9 +14,12 @@ import {
   deleteSerial,
   getProducts,
   getSerials,
+  getWarrantyPolicies,
   rejectSerial,
+  updateProduct,
   type Product,
   type Serial,
+  type WarrantyPolicy,
 } from "@/lib/api";
 import {
   BrowserMultiFormatReader,
@@ -113,13 +116,19 @@ function getSerialWarrantyDates(serial: Serial, product?: Product | null) {
 export default function SerialsPage() {
   const [serials, setSerials] = useState<Serial[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [warrantyPolicies, setWarrantyPolicies] = useState<WarrantyPolicy[]>([]);
 
     const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingSerialId, setDeletingSerialId] =
     useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canEditWarrantyType, setCanEditWarrantyType] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingWarrantySerial, setEditingWarrantySerial] = useState<Serial | null>(null);
+  const [selectedWarrantyPolicyId, setSelectedWarrantyPolicyId] = useState("");
+  const [warrantyPolicySaving, setWarrantyPolicySaving] = useState(false);
+  const [warrantyPolicyError, setWarrantyPolicyError] = useState("");
 
   /* ======================================================
      REJECT / APPROVE REJECT
@@ -206,6 +215,7 @@ export default function SerialsPage() {
       const [
         serialsData,
         productsData,
+        warrantyPoliciesData,
       ] = await Promise.all([
         getSerials(
           page,
@@ -215,6 +225,7 @@ export default function SerialsPage() {
           status,
         ),
         getProducts(),
+        getWarrantyPolicies(),
       ]);
 
       setSerials(serialsData.data);
@@ -224,6 +235,7 @@ export default function SerialsPage() {
       );
 
       setProducts(productsData);
+      setWarrantyPolicies(warrantyPoliciesData.filter((policy) => policy.isActive));
     } catch (err) {
       console.error(err);
 
@@ -249,8 +261,12 @@ export default function SerialsPage() {
         : null;
 
       setIsAdmin(authUser?.role === "ADMIN");
+      setCanEditWarrantyType(
+        ["ADMIN", "BOSS", "MANAGER"].includes(authUser?.role),
+      );
     } catch {
       setIsAdmin(false);
+      setCanEditWarrantyType(false);
     }
   }, []);
 
@@ -704,6 +720,49 @@ export default function SerialsPage() {
     }
   }
 
+  function openWarrantyTypeEditor(serial: Serial) {
+    const product = serial.product || serial.shipmentItem?.product;
+    if (!product) {
+      setError("This serial is not linked to a product, so its warranty type cannot be edited.");
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    setWarrantyPolicyError("");
+    setSelectedWarrantyPolicyId(
+      product.warrantyPolicyId ?? product.warrantyPolicy?.id ?? "",
+    );
+    setEditingWarrantySerial(serial);
+  }
+
+  async function handleWarrantyTypeSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingWarrantySerial || !selectedWarrantyPolicyId) return;
+
+    const product =
+      editingWarrantySerial.product ||
+      editingWarrantySerial.shipmentItem?.product;
+    if (!product) return;
+
+    try {
+      setWarrantyPolicySaving(true);
+      setWarrantyPolicyError("");
+      await updateProduct(product.id, {
+        warrantyPolicyId: selectedWarrantyPolicyId,
+      });
+      setEditingWarrantySerial(null);
+      setSuccess(`Warranty type updated for ${product.productCode}.`);
+      await loadData();
+    } catch (err) {
+      setWarrantyPolicyError(
+        err instanceof Error ? err.message : "Unable to update warranty type.",
+      );
+    } finally {
+      setWarrantyPolicySaving(false);
+    }
+  }
+
   function formatProductCompact(product: Product) {
   const specs = [
     product.ratedCurrent,
@@ -855,6 +914,69 @@ export default function SerialsPage() {
                 </div>
               </form>
 
+            </div>
+          </div>
+        )}
+
+        {/* Edit Warranty Type Modal */}
+        {editingWarrantySerial && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+              <div className="border-b border-slate-200 px-6 py-5">
+                <h3 className="text-lg font-bold text-slate-900">Edit Warranty Type</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Serial {formatSerial(editingWarrantySerial.serialNumber)} · {(editingWarrantySerial.product || editingWarrantySerial.shipmentItem?.product)?.productCode}
+                </p>
+              </div>
+              <form onSubmit={handleWarrantyTypeSave} className="space-y-5 p-6">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="serial-warranty-policy">
+                    Warranty Type
+                  </label>
+                  <select
+                    id="serial-warranty-policy"
+                    value={selectedWarrantyPolicyId}
+                    onChange={(event) => setSelectedWarrantyPolicyId(event.target.value)}
+                    required
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <option value="">Select warranty type</option>
+                    {warrantyPolicies.map((policy) => (
+                      <option key={policy.id} value={policy.id}>
+                        {policy.code} — {policy.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  This warranty type belongs to the product, so changing it updates the type shown for every serial linked to this product.
+                </div>
+
+                {warrantyPolicyError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {warrantyPolicyError}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingWarrantySerial(null)}
+                    disabled={warrantyPolicySaving}
+                    className="h-11 rounded-xl border border-slate-300 px-5 font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={warrantyPolicySaving || !selectedWarrantyPolicyId}
+                    className="h-11 rounded-xl bg-emerald-600 px-5 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {warrantyPolicySaving ? "Saving..." : "Save Type"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1198,6 +1320,16 @@ export default function SerialsPage() {
     {/* Actions */}
     <td className="px-5 py-4">
       <div className="flex items-center gap-2">
+        {canEditWarrantyType && serial.status === "IN_STOCK" && (
+          <button
+            type="button"
+            onClick={() => openWarrantyTypeEditor(serial)}
+            className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+          >
+            Edit Type
+          </button>
+        )}
+
         {isAdmin && (
           <button
             type="button"
