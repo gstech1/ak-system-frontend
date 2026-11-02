@@ -50,6 +50,11 @@ const emptyForm: FormState = {
   warrantyPolicyId: "",
 };
 
+function numericPoleValue(value: string | number | null | undefined) {
+  const match = String(value ?? "").match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
 function productToForm(product: Product): FormState {
   return {
     productCode: product.productCode,
@@ -114,6 +119,13 @@ export default function ProductsPage() {
 
   const [breakingCapacities, setBreakingCapacities] =
     useState<ProductOption[]>([]);
+
+  const selectedPolesOptionValue =
+    polesOptions.find(
+      (option) =>
+        numericPoleValue(option.optionValue) !== null &&
+        numericPoleValue(option.optionValue) === numericPoleValue(form.poles),
+    )?.optionValue ?? form.poles;
   async function loadData() {
   try {
     setLoading(true);
@@ -520,7 +532,7 @@ async function handleSubmit(
       form.category.trim(),
 
     poles: form.poles
-      ? Number(form.poles)
+      ? numericPoleValue(form.poles) ?? undefined
       : undefined,
 
     ratedCurrent:
@@ -834,6 +846,11 @@ async function handleToggleProductStatus(
         Select Category
       </option>
 
+      {form.category &&
+        !productTypes.some((option) => option.optionValue === form.category) && (
+          <option value={form.category}>{form.category}</option>
+        )}
+
       {productTypes.map((option) => (
         <option
           key={option.id}
@@ -862,11 +879,11 @@ async function handleToggleProductStatus(
 
   <div className="flex gap-2">
     <select
-      value={form.poles}
+      value={selectedPolesOptionValue}
       onChange={(event) =>
         updateField(
           "poles",
-          event.target.value,
+          String(numericPoleValue(event.target.value) ?? event.target.value),
         )
       }
       className="h-12 flex-1 rounded-xl border border-slate-300 bg-white px-4 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
@@ -874,6 +891,14 @@ async function handleToggleProductStatus(
       <option value="">
         Select Poles
       </option>
+
+      {form.poles &&
+        !polesOptions.some(
+          (option) =>
+            numericPoleValue(option.optionValue) === numericPoleValue(form.poles),
+        ) && (
+          <option value={form.poles}>{form.poles}</option>
+        )}
 
       {polesOptions.map((option) => (
         <option
@@ -916,6 +941,11 @@ async function handleToggleProductStatus(
         Select Rated Current
       </option>
 
+      {form.ratedCurrent &&
+        !ratedCurrents.some((option) => option.optionValue === form.ratedCurrent) && (
+          <option value={form.ratedCurrent}>{form.ratedCurrent}</option>
+        )}
+
       {ratedCurrents.map((option) => (
         <option
           key={option.id}
@@ -957,6 +987,11 @@ async function handleToggleProductStatus(
         Select Rated Voltage
       </option>
 
+      {form.ratedVoltage &&
+        !ratedVoltages.some((option) => option.optionValue === form.ratedVoltage) && (
+          <option value={form.ratedVoltage}>{form.ratedVoltage}</option>
+        )}
+
       {ratedVoltages.map((option) => (
         <option
           key={option.id}
@@ -997,6 +1032,11 @@ async function handleToggleProductStatus(
       <option value="">
         Select Breaking Capacity
       </option>
+
+      {form.breakingCapacity &&
+        !breakingCapacities.some((option) => option.optionValue === form.breakingCapacity) && (
+          <option value={form.breakingCapacity}>{form.breakingCapacity}</option>
+        )}
 
       {breakingCapacities.map((option) => (
         <option
