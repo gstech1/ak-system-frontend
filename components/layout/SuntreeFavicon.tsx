@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 export default function SuntreeFavicon() {
   useEffect(() => {
-    const iconPath = "/images/logo/suntree-logo.png";
+    const iconPath = "/images/logo/suntree-favicon.png";
     const iconLinks = document.querySelectorAll<HTMLLinkElement>(
       'link[rel~="icon"]',
     );
