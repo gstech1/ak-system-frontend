@@ -466,6 +466,8 @@ export interface Serial {
   id: string;
   serialNumber: string;
   status: string;
+  warrantyPolicyId?: string | null;
+  warrantyPolicy?: WarrantyPolicy | null;
 
   rejectReason?: string | null;
   rejectedAt?: string | null;
@@ -577,6 +579,30 @@ export async function getSerialByNumber(
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     throw new Error(errorData?.message || "Serial number was not found.");
+  }
+
+  return response.json();
+}
+
+export async function updateSerialWarrantyPolicy(
+  serialNumber: string,
+  warrantyPolicyId: string,
+): Promise<Serial> {
+  const response = await fetch(
+    `${API_BASE_URL}/serials/${encodeURIComponent(serialNumber)}/warranty-policy`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ warrantyPolicyId }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || "Unable to update serial warranty type.");
   }
 
   return response.json();

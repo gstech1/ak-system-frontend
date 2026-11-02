@@ -16,7 +16,7 @@ import {
   getSerials,
   getWarrantyPolicies,
   rejectSerial,
-  updateProduct,
+  updateSerialWarrantyPolicy,
   type Product,
   type Serial,
   type WarrantyPolicy,
@@ -79,8 +79,9 @@ function earlierDate(first: string | null, second: string | null) {
 }
 
 function getSerialWarrantyDates(serial: Serial, product?: Product | null) {
-  const code = (product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "").toUpperCase();
-  const months = product?.warrantyPolicyMonths ?? product?.warrantyPolicy?.warrantyMonths ?? product?.warrantyMonths ?? 12;
+  const policy = serial.warrantyPolicy ?? product?.warrantyPolicy;
+  const code = (policy?.code ?? product?.warrantyPolicyCode ?? "").toUpperCase();
+  const months = policy?.warrantyMonths ?? product?.warrantyPolicyMonths ?? product?.warrantyMonths ?? 12;
   const shipmentIsComplete =
     serial.status === "SHIPPED" || serial.status === "REGISTERED";
   const purchaseDate =
@@ -106,7 +107,7 @@ function getSerialWarrantyDates(serial: Serial, product?: Product | null) {
     return { start: serial.warranty?.warrantyStart ?? null, end: serial.warranty?.warrantyEnd ?? null };
   }
 
-  const dealerPurchaseStart = product?.warrantyStartRule === "DEALER_PURCHASE";
+  const dealerPurchaseStart = (policy?.startRule ?? product?.warrantyStartRule) === "DEALER_PURCHASE";
   return {
     start: serial.warranty?.warrantyStart ?? (dealerPurchaseStart ? purchaseDate : null),
     end: serial.warranty?.warrantyEnd ?? (dealerPurchaseStart ? addMonths(purchaseDate, months) : null),
@@ -731,7 +732,7 @@ export default function SerialsPage() {
     setSuccess("");
     setWarrantyPolicyError("");
     setSelectedWarrantyPolicyId(
-      product.warrantyPolicyId ?? product.warrantyPolicy?.id ?? "",
+      serial.warrantyPolicyId ?? serial.warrantyPolicy?.id ?? product.warrantyPolicyId ?? product.warrantyPolicy?.id ?? "",
     );
     setEditingWarrantySerial(serial);
   }
@@ -740,19 +741,15 @@ export default function SerialsPage() {
     event.preventDefault();
     if (!editingWarrantySerial || !selectedWarrantyPolicyId) return;
 
-    const product =
-      editingWarrantySerial.product ||
-      editingWarrantySerial.shipmentItem?.product;
-    if (!product) return;
-
     try {
       setWarrantyPolicySaving(true);
       setWarrantyPolicyError("");
-      await updateProduct(product.id, {
-        warrantyPolicyId: selectedWarrantyPolicyId,
-      });
+      await updateSerialWarrantyPolicy(
+        editingWarrantySerial.serialNumber,
+        selectedWarrantyPolicyId,
+      );
       setEditingWarrantySerial(null);
-      setSuccess(`Warranty type updated for ${product.productCode}.`);
+      setSuccess(`Warranty type updated for serial ${formatSerial(editingWarrantySerial.serialNumber)}.`);
       await loadData();
     } catch (err) {
       setWarrantyPolicyError(
@@ -949,8 +946,8 @@ export default function SerialsPage() {
                   </select>
                 </div>
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  This warranty type belongs to the product, so changing it updates the type shown for every serial linked to this product.
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  This change applies only to this serial number. Other serials linked to the same product keep their current warranty type.
                 </div>
 
                 {warrantyPolicyError && (
@@ -1288,7 +1285,7 @@ export default function SerialsPage() {
 
     {/* Warranty policy type */}
     <td className="px-5 py-4 text-sm font-semibold text-slate-700">
-      {product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "—"}
+      {serial.warrantyPolicy?.code ?? product?.warrantyPolicyCode ?? product?.warrantyPolicy?.code ?? "—"}
     </td>
 
     {/* Warranty start */}
