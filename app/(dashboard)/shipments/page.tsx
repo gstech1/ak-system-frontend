@@ -810,7 +810,7 @@ export default function ShipmentsPage() {
                     Select dealer
                   </option>
 
-                  {dealers.map(
+                  {dealers.filter((dealer) => dealer.status === "ACTIVE").map(
                     (dealer) => (
                       <option
                         key={dealer.id}
