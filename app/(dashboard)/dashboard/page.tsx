@@ -6,6 +6,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 import StatCard from "@/components/common/StatCard";
 import QuickActionCard from "@/components/common/QuickActionCard";
+import { getCurrentAuthUser } from "@/lib/current-user";
 
 import {
   DashboardSummary,
@@ -24,11 +25,11 @@ export default function DashboardPage() {
     let mounted = true;
 
     try {
-      const authUser = JSON.parse(
-        localStorage.getItem("authUser") ?? "null",
-      );
+      const authUser = getCurrentAuthUser();
       setCanViewRecentActivity(
-        authUser?.role === "ADMIN" || authUser?.role === "MANAGER",
+        ["ADMIN", "BOSS", "MANAGER"].includes(
+          authUser?.role?.trim().toUpperCase() ?? "",
+        ),
       );
     } catch {
       setCanViewRecentActivity(false);
