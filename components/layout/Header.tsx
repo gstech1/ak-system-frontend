@@ -6,6 +6,11 @@ import { usePathname } from "next/navigation";
 import { useDashboardLanguage } from "@/components/layout/DashboardLanguageProvider";
 import { getCurrentAuthUser, type CurrentAuthUser } from "@/lib/current-user";
 
+type HeaderProps = {
+  authUser?: CurrentAuthUser | null;
+  authLoaded?: boolean;
+};
+
 function getRoleLabel(role?: string) {
   const normalized = role?.trim().toUpperCase();
   if (!normalized) return "User";
@@ -24,18 +29,22 @@ function getRoleLabel(role?: string) {
   return labels[normalized] ?? normalized;
 }
 
-export default function Header() {
+export default function Header({ authUser, authLoaded }: HeaderProps = {}) {
   const pathname = usePathname();
   const { language, setLanguage } = useDashboardLanguage();
 
-  const [user, setUser] = useState<CurrentAuthUser | null>(null);
-  const [userLoaded, setUserLoaded] = useState(false);
+  const [localUser, setLocalUser] = useState<CurrentAuthUser | null>(null);
+  const [localUserLoaded, setLocalUserLoaded] = useState(false);
   useEffect(() => {
+    if (authLoaded !== undefined) return;
     // User profile is restored from the browser session after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUser(getCurrentAuthUser());
-    setUserLoaded(true);
-  }, []);
+    setLocalUser(getCurrentAuthUser());
+    setLocalUserLoaded(true);
+  }, [authLoaded]);
+
+  const user = authLoaded === undefined ? localUser : authUser ?? null;
+  const userLoaded = authLoaded ?? localUserLoaded;
 
   // Only MTK Solar Warehouse uses MTK header.
   const isMTKSolar =

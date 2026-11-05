@@ -11,7 +11,12 @@ import { Truck } from "lucide-react";
 import { SIDEBAR_MENU } from "@/constants/menu";
 import { getCurrentAuthUser, type CurrentAuthUser } from "@/lib/current-user";
 
-export default function Sidebar() {
+type SidebarProps = {
+  authUser?: CurrentAuthUser | null;
+  authLoaded?: boolean;
+};
+
+export default function Sidebar({ authUser, authLoaded }: SidebarProps = {}) {
   const pathname = usePathname();
 
   /*
@@ -20,10 +25,10 @@ export default function Sidebar() {
    * This prevents hydration mismatch because
    * localStorage does not exist during SSR.
    */
-  const [authUser, setAuthUser] =
+  const [localAuthUser, setLocalAuthUser] =
     useState<CurrentAuthUser | null>(null);
 
-  const [authLoaded, setAuthLoaded] =
+  const [localAuthLoaded, setLocalAuthLoaded] =
     useState(false);
 
   /*
@@ -31,16 +36,20 @@ export default function Sidebar() {
    * after the component mounts.
    */
   useEffect(() => {
-    setAuthUser(getCurrentAuthUser());
-    setAuthLoaded(true);
-  }, []);
+    if (authLoaded !== undefined) return;
+    setLocalAuthUser(getCurrentAuthUser());
+    setLocalAuthLoaded(true);
+  }, [authLoaded]);
+
+  const currentUser = authLoaded === undefined ? localAuthUser : authUser ?? null;
+  const currentAuthLoaded = authLoaded ?? localAuthLoaded;
 
   /*
    * While authentication data is loading,
    * keep the server and first client render
    * identical.
    */
-  if (!authLoaded) {
+  if (!currentAuthLoaded) {
     return (
       <aside className="flex h-screen w-72 flex-col bg-slate-900 text-white">
         {/* System Switcher */}
@@ -108,10 +117,20 @@ export default function Sidebar() {
     );
   }
 
-  const role = authUser?.role?.trim().toUpperCase() ?? "";
+  const role = currentUser?.role?.trim().toUpperCase() ?? "";
+  const roleLabels: Record<string, string> = {
+    ADMIN: "Admin",
+    BOSS: "Boss",
+    MANAGER: "Manager",
+    WAREHOUSE: "Warehouse",
+    SERVICE: "Service",
+    DEALER: "Dealer",
+    SALES: "Sales",
+    MARKETING: "Marketing",
+  };
 
   const permissions =
-    authUser?.permissions ?? [];
+    currentUser?.permissions ?? [];
 
   /*
    * SUPER ADMIN / ADMIN
@@ -225,13 +244,12 @@ export default function Sidebar() {
         </p>
 
         <p className="mt-1 font-semibold text-white">
-          {authUser?.username ??
+          {currentUser?.username ??
             "User"}
         </p>
 
         <p className="mt-1 text-xs font-medium text-emerald-400">
-          {role ||
-            "Unknown Role"}
+          {roleLabels[role] ?? (role || "Unknown Role")}
         </p>
       </div>
 
