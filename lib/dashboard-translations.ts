@@ -549,4 +549,5 @@ Object.assign(MY_TRANSLATIONS, {
   "Print 80 mm": "80 mm စာရွက် ပုံနှိပ်ရန်",
   "Print 80 mm Receipt": "80 mm ပြေစာ ပုံနှိပ်ရန်",
   "Recommended: 1080 × 1080 px": "အကြံပြုအရွယ်အစား: 1080 × 1080 px",
+  "Your login session has expired. Please log in again.": "ဝင်ရောက်ထားသည့် session သက်တမ်းကုန်သွားပါပြီ။ ကျေးဇူးပြု၍ ပြန်လည်ဝင်ရောက်ပါ။",
 });
