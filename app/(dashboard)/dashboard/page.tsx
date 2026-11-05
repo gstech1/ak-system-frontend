@@ -11,6 +11,10 @@ import { getCurrentAuthUser } from "@/lib/current-user";
 import {
   DashboardSummary,
   getDashboardSummary,
+  getPendingWarrantyExtensionRequests,
+  getWarrantyExtensionReminders,
+  type WarrantyExtensionRequest,
+  type WarrantyExtensionReminder,
 } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -20,17 +24,19 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [canViewRecentActivity, setCanViewRecentActivity] = useState(false);
+  const [extensionReminders, setExtensionReminders] = useState<WarrantyExtensionReminder[]>([]);
+  const [pendingExtensionRequests, setPendingExtensionRequests] = useState<WarrantyExtensionRequest[]>([]);
 
   useEffect(() => {
     let mounted = true;
+    let canViewManagementSummary = false;
 
     try {
       const authUser = getCurrentAuthUser();
-      setCanViewRecentActivity(
-        ["ADMIN", "BOSS", "MANAGER"].includes(
-          authUser?.role?.trim().toUpperCase() ?? "",
-        ),
+      canViewManagementSummary = ["ADMIN", "BOSS", "MANAGER"].includes(
+        authUser?.role?.trim().toUpperCase() ?? "",
       );
+      setCanViewRecentActivity(canViewManagementSummary);
     } catch {
       setCanViewRecentActivity(false);
     }
@@ -41,9 +47,17 @@ export default function DashboardPage() {
         setError("");
 
         const data = await getDashboardSummary();
+        const [reminders, requests] = canViewManagementSummary
+          ? await Promise.all([
+              getWarrantyExtensionReminders().catch(() => []),
+              getPendingWarrantyExtensionRequests().catch(() => []),
+            ])
+          : [[], []];
 
         if (mounted) {
           setSummary(data);
+          setExtensionReminders(reminders);
+          setPendingExtensionRequests(requests);
         }
       } catch (err) {
         if (mounted) {
@@ -157,7 +171,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Attention Required */}
-      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section id="attention-required" className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-900">
             Attention Required
@@ -168,7 +182,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className={`grid gap-4 ${canViewRecentActivity ? "lg:grid-cols-2 xl:grid-cols-5" : "lg:grid-cols-3"}`}>
           <div className="flex items-center justify-between rounded-xl bg-amber-50 px-4 py-4">
             <div>
               <p className="font-semibold text-slate-900">
@@ -216,6 +230,22 @@ export default function DashboardPage() {
               {value(summary?.returns.pending)}
             </span>
           </div>
+
+          {canViewRecentActivity && <a href="/shipments" className="flex items-center justify-between rounded-xl bg-amber-50 px-4 py-4 transition hover:bg-amber-100">
+            <div>
+              <p className="font-semibold text-slate-900">G/H Stock Warranty Reminders</p>
+              <p className="text-sm text-slate-500">Dealer stock due for review before warranty extension.</p>
+            </div>
+            <span className="text-2xl font-black text-amber-600">{loading ? "—" : extensionReminders.length}</span>
+          </a>}
+
+          {canViewRecentActivity && <a href="/shipments" className="flex items-center justify-between rounded-xl bg-violet-50 px-4 py-4 transition hover:bg-violet-100">
+            <div>
+              <p className="font-semibold text-slate-900">Pending G/H Extension Requests</p>
+              <p className="text-sm text-slate-500">Dealer requests waiting for staff review.</p>
+            </div>
+            <span className="text-2xl font-black text-violet-600">{loading ? "—" : pendingExtensionRequests.length}</span>
+          </a>}
         </div>
       </section>
 
@@ -278,8 +308,8 @@ export default function DashboardPage() {
                 Backend API
               </span>
 
-              <span className="font-semibold text-emerald-600">
-                Connected
+              <span className={`font-semibold ${loading ? "text-amber-600" : error ? "text-red-600" : "text-emerald-600"}`}>
+                {loading ? "Checking" : error ? "Unavailable" : "Connected"}
               </span>
             </div>
 
@@ -288,8 +318,8 @@ export default function DashboardPage() {
                 Database
               </span>
 
-              <span className="font-semibold text-emerald-600">
-                Connected
+              <span className={`font-semibold ${loading ? "text-amber-600" : error ? "text-red-600" : "text-emerald-600"}`}>
+                {loading ? "Checking" : error ? "Unavailable" : "Connected"}
               </span>
             </div>
 
