@@ -34,6 +34,8 @@ export default function DealerDashboardPage() {
   const [checking, setChecking] = useState(true);
   const [registrationReminders, setRegistrationReminders] = useState<RegistrationReminder[]>([]);
   const [extensionReminders, setExtensionReminders] = useState<WarrantyExtensionReminder[]>([]);
+  const [overviewError, setOverviewError] = useState("");
+  const [overviewRetry, setOverviewRetry] = useState(0);
 
   useEffect(() => {
     try {
@@ -60,22 +62,37 @@ export default function DealerDashboardPage() {
   useEffect(() => {
     if (!auth?.accessToken) return;
     let cancelled = false;
-    fetch(`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001").replace(/\/+$/, "")}/warranty/dealer/overview`, {
-      headers: { Authorization: `Bearer ${auth.accessToken}` },
-      cache: "no-store",
-    }).then(async (response) => {
-      if (!response.ok) return null;
-      return response.json();
-    }).then((data) => {
-      if (!cancelled && Array.isArray(data?.registrationReminders)) {
-        setRegistrationReminders(data.registrationReminders);
+    setOverviewError("");
+    void (async () => {
+      try {
+        const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001").replace(/\/+$/, "")}/warranty/dealer/overview`, {
+          headers: { Authorization: `Bearer ${auth.accessToken}` },
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => null);
+        if (response.status === 401) {
+          localStorage.removeItem("dealerAuth");
+          router.replace("/warranty/dealer-login");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(data?.message || "သတိပေးချက်များကို ဖတ်မရပါ။");
+        }
+        if (!Array.isArray(data?.registrationReminders) || !Array.isArray(data?.warrantyExtensionReminders)) {
+          throw new Error("သတိပေးချက်စာရင်းပုံစံ မမှန်ပါ။ ပြန်စမ်းကြည့်ပါ။");
+        }
+        if (!cancelled) {
+          setRegistrationReminders(data.registrationReminders);
+          setExtensionReminders(data.warrantyExtensionReminders);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setOverviewError(error instanceof Error ? error.message : "သတိပေးချက်များကို ဖတ်မရပါ။");
+        }
       }
-      if (!cancelled && Array.isArray(data?.warrantyExtensionReminders)) {
-        setExtensionReminders(data.warrantyExtensionReminders);
-      }
-    }).catch(() => undefined);
+    })();
     return () => { cancelled = true; };
-  }, [auth]);
+  }, [auth, overviewRetry, router]);
 
   function logout() {
     localStorage.removeItem("dealerAuth");
@@ -98,6 +115,12 @@ export default function DealerDashboardPage() {
           </div>
           <div className="px-5 py-4"><h2 className="text-lg font-bold text-slate-800">ဘာလုပ်မလဲ ရွေးပါ</h2><p className="mt-1 text-sm text-slate-500">လိုအပ်တဲ့လုပ်ဆောင်မှုကိုသာ ဖွင့်နိုင်ပါတယ်။</p></div>
         </header>
+
+        {overviewError && <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">အာမခံသတိပေးချက်များကို အတည်မပြုနိုင်ပါ။</p>
+          <p className="mt-1">{overviewError}</p>
+          <button type="button" onClick={() => setOverviewRetry((value) => value + 1)} className="mt-2 font-bold underline">ထပ်မံစစ်ဆေးရန်</button>
+        </div>}
 
         {registrationReminders.length > 0 && <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm" aria-label="Warranty registration reminders">
           <div className="flex items-start gap-3">
