@@ -139,6 +139,8 @@ export default function DealersPage() {
 
   const [canViewDealerStock, setCanViewDealerStock] =
     useState(false);
+  const [canManageDealers, setCanManageDealers] =
+    useState(false);
 
   const [showStockInfo, setShowStockInfo] =
     useState(false);
@@ -215,6 +217,10 @@ export default function DealersPage() {
       const storedUser = localStorage.getItem('authUser');
       const user = storedUser ? JSON.parse(storedUser) : null;
       const allowedRoles = ['ADMIN', 'BOSS', 'MANAGER', 'SALES'];
+      setCanManageDealers(
+        user?.role === 'ADMIN' ||
+          user?.permissions?.includes('DEALERS_MANAGE'),
+      );
       // Access is restored from the browser session after mount.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanViewDealerStock(
@@ -223,6 +229,7 @@ export default function DealersPage() {
             user?.permissions?.includes('DEALERS_VIEW')),
       );
     } catch {
+      setCanManageDealers(false);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanViewDealerStock(false);
     }
@@ -759,7 +766,7 @@ return (
           subtitle="Manage Dealer information, login accounts, passwords and account status."
         />
 
-        <button
+        {canManageDealers && <button
           type="button"
           onClick={() => {
             setForm(initialForm);
@@ -770,7 +777,7 @@ return (
           className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
         >
           + Create Dealer
-        </button>
+        </button>}
       </div>
 
         {error && (
@@ -888,6 +895,7 @@ return (
 
               <td className="px-5 py-4">
                 <div className="flex justify-end gap-2">
+                  {canManageDealers && <>
                   <button
                     type="button"
                     onClick={() =>
@@ -989,6 +997,7 @@ return (
                       ? 'Deactivate'
                       : 'Activate'}
                   </button>
+                  </>}
 
                   {localStorage.getItem('authUser') &&
                   JSON.parse(
@@ -1446,7 +1455,7 @@ return (
             </div>
 
             <div className="flex justify-end gap-3">
-              <button
+              {canManageDealers && <button
                 type="button"
                 onClick={() => {
                   setShowDetails(false);
@@ -1455,7 +1464,7 @@ return (
                 className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
                 Edit
-              </button>
+              </button>}
 
               <button
                 type="button"

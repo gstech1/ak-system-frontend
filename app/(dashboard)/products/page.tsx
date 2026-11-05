@@ -91,6 +91,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+  const [canCreateProducts, setCanCreateProducts] = useState(false);
+  const [canDeleteProducts, setCanDeleteProducts] = useState(false);
 
   const [showForm, setShowForm] =
     useState(false);
@@ -203,6 +205,21 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const authUser = JSON.parse(
+        localStorage.getItem("authUser") ?? "null",
+      );
+      setCanCreateProducts(
+        ["ADMIN", "MANAGER"].includes(authUser?.role),
+      );
+      setCanDeleteProducts(authUser?.role === "ADMIN");
+    } catch {
+      setCanCreateProducts(false);
+      setCanDeleteProducts(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -713,13 +730,13 @@ async function handleToggleProductStatus(
           </p>
         </div>
 
-        <button
+        {canCreateProducts && <button
           type="button"
           onClick={openCreateForm}
           className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white shadow-sm transition hover:bg-emerald-700"
         >
           + Add Product
-        </button>
+        </button>}
       </div>
 
       {/* Messages */}
@@ -878,13 +895,13 @@ async function handleToggleProductStatus(
       ))}
     </select>
 
-    <button
+    {canCreateProducts && <button
       type="button"
       onClick={handleAddCategory}
       className="h-12 shrink-0 rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700"
     >
       + Add
-    </button>
+    </button>}
   </div>
 </div>
 
@@ -927,13 +944,13 @@ async function handleToggleProductStatus(
       ))}
     </select>
 
-    <button
+    {canCreateProducts && <button
       type="button"
       onClick={handleAddPoles}
       className="h-12 shrink-0 rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700"
     >
       + Add
-    </button>
+    </button>}
   </div>
 </div>
 
@@ -973,13 +990,13 @@ async function handleToggleProductStatus(
       ))}
     </select>
 
-    <button
+    {canCreateProducts && <button
       type="button"
       onClick={handleAddRatedCurrent}
       className="h-12 shrink-0 rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700"
     >
       + Add
-    </button>
+    </button>}
   </div>
 </div>
 
@@ -1019,13 +1036,13 @@ async function handleToggleProductStatus(
       ))}
     </select>
 
-    <button
+    {canCreateProducts && <button
       type="button"
       onClick={handleAddRatedVoltage}
       className="h-12 shrink-0 rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700"
     >
       + Add
-    </button>
+    </button>}
   </div>
 </div>
 
@@ -1065,13 +1082,13 @@ async function handleToggleProductStatus(
       ))}
     </select>
 
-    <button
+    {canCreateProducts && <button
       type="button"
       onClick={handleAddBreakingCapacity}
       className="h-12 shrink-0 rounded-xl bg-emerald-600 px-4 font-bold text-white transition hover:bg-emerald-700"
     >
       + Add
-    </button>
+    </button>}
   </div>
 </div>
 
@@ -1318,7 +1335,7 @@ async function handleToggleProductStatus(
       {loadingEditId === product.id ? "Loading…" : "Edit"}
     </button>
 
-    <button
+    {canDeleteProducts && <button
       type="button"
       onClick={() =>
         handleDelete(product)
@@ -1326,7 +1343,7 @@ async function handleToggleProductStatus(
       className="rounded-xl border border-red-200 px-4 py-2 font-semibold text-red-600 transition hover:bg-red-50"
     >
       Delete
-    </button>
+    </button>}
   </div>
 
                 </div>

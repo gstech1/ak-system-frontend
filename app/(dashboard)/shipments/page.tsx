@@ -92,6 +92,10 @@ export default function ShipmentsPage() {
 
   const [canConfirmShipments, setCanConfirmShipments] =
     useState(false);
+  const [canManageServiceIssues, setCanManageServiceIssues] =
+    useState(false);
+  const [canDeleteDraftShipments, setCanDeleteDraftShipments] =
+    useState(false);
 
   const [isAdmin, setIsAdmin] =
     useState(false);
@@ -174,9 +178,17 @@ export default function ShipmentsPage() {
         setCanConfirmShipments(
           ["ADMIN", "MANAGER", "WAREHOUSE"].includes(authUser?.role),
         );
+        setCanManageServiceIssues(
+          ["ADMIN", "MANAGER", "WAREHOUSE", "SERVICE"].includes(authUser?.role),
+        );
+        setCanDeleteDraftShipments(
+          ["ADMIN", "MANAGER"].includes(authUser?.role),
+        );
       } catch {
         setIsAdmin(false);
         setCanConfirmShipments(false);
+        setCanManageServiceIssues(false);
+        setCanDeleteDraftShipments(false);
       }
 
       if (!token) {
@@ -653,21 +665,21 @@ export default function ShipmentsPage() {
             subtitle="Record dealer sales and service team stock issues in one place."
           />
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            <button type="button" onClick={() => {
+            {canConfirmShipments && <button type="button" onClick={() => {
               setError(""); setSuccess(""); setShowServiceForm(false); setShowReturnPanel(false); resetForm(); setShowForm(true); setListMode("SALES");
             }} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700">
               + Create Shipment
-            </button>
-            <button type="button" onClick={() => {
+            </button>}
+            {canManageServiceIssues && <button type="button" onClick={() => {
               setError(""); setSuccess(""); setShowForm(false); setShowReturnPanel(false); resetServiceForm(); setShowServiceForm(true); setListMode("SERVICE");
             }} className="rounded-xl border border-emerald-700 bg-white px-5 py-3 font-bold text-emerald-800 transition hover:bg-emerald-50">
               Service Issue
-            </button>
-            <button type="button" onClick={() => {
+            </button>}
+            {canManageServiceIssues && <button type="button" onClick={() => {
               setError(""); setSuccess(""); setShowForm(false); setShowServiceForm(false); resetForm(); setShowReturnPanel(true);
             }} className="rounded-xl border border-amber-500 bg-white px-5 py-3 font-bold text-amber-800 transition hover:bg-amber-50">
               Service Return
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -1101,8 +1113,7 @@ export default function ShipmentsPage() {
                               {confirming === shipment.id ? "Confirming..." : "Confirm"}
                             </button>
                           )}
-                          {(shipment.status ===
-                            "DRAFT" || isAdmin) && (
+                          {(shipment.status === "DRAFT" && canDeleteDraftShipments || isAdmin) && (
                             <button
                               type="button"
                               onClick={() =>
@@ -1203,7 +1214,7 @@ export default function ShipmentsPage() {
                       <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{returnedCount} returned</span>
                       <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-700">{soldCount} sold · warranty active</span>
                       <button type="button" onClick={() => printServiceReceipt(issue)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800"><Printer size={15} /> Print 80 mm</button>
-                      {issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); setListMode("SERVICE"); setShowReturnPanel(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
+                      {canManageServiceIssues && issue.status === "OPEN" && <button type="button" onClick={() => { setError(""); setReturnIssueId(issue.id); setReturnedSerials([]); setReturnScan(""); setListMode("SERVICE"); setShowReturnPanel(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Return</button>}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
