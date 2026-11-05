@@ -108,7 +108,7 @@ export default function Sidebar() {
     );
   }
 
-  const role = authUser?.role ?? "";
+  const role = authUser?.role?.trim().toUpperCase() ?? "";
 
   const permissions =
     authUser?.permissions ?? [];
