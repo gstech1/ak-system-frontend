@@ -203,12 +203,12 @@ export default function ShipmentsPage() {
       }
 
       const [
-        shipmentResponse,
-        serviceIssueResponse,
-        dealerResponse,
-        reminderResponse,
-        extensionRequestResponse,
-      ] = await Promise.all([
+        shipmentResult,
+        serviceIssueResult,
+        dealerResult,
+        reminderResult,
+        extensionRequestResult,
+      ] = await Promise.allSettled([
         getShipments(),
         getSuntreeServiceIssues(),
 
@@ -218,32 +218,50 @@ export default function ShipmentsPage() {
           },
           cache: "no-store",
         }),
-        getWarrantyExtensionReminders().catch(() => []),
-        getPendingWarrantyExtensionRequests().catch(() => []),
+        getWarrantyExtensionReminders(),
+        getPendingWarrantyExtensionRequests(),
       ]);
 
-      const dealerData =
-        await dealerResponse
-          .json()
-          .catch(() => null);
+      const loadErrors: string[] = [];
+      const messageOf = (reason: unknown) => {
+        const message = reason instanceof Error ? reason.message : "Unable to load data.";
+        return /unauthorized|token expired/i.test(message)
+          ? "Your login session has expired. Please log in again."
+          : message;
+      };
 
-      if (!dealerResponse.ok) {
-        throw new Error(
-          dealerData?.message ||
-            `Failed to load dealers (${dealerResponse.status})`,
-        );
+      if (shipmentResult.status === "fulfilled") {
+        setShipments(shipmentResult.value);
+      } else {
+        loadErrors.push(`Shipments: ${messageOf(shipmentResult.reason)}`);
       }
 
-      setShipments(shipmentResponse);
-      setServiceIssues(serviceIssueResponse);
-      setWarrantyExtensionReminders(reminderResponse);
-      setPendingWarrantyExtensionRequests(extensionRequestResponse);
+      if (serviceIssueResult.status === "fulfilled") {
+        setServiceIssues(serviceIssueResult.value);
+      } else {
+        loadErrors.push(`Service issues: ${messageOf(serviceIssueResult.reason)}`);
+      }
 
-      setDealers(
-        Array.isArray(dealerData)
-          ? dealerData
-          : [],
+      if (dealerResult.status === "fulfilled") {
+        const dealerResponse = dealerResult.value;
+        const dealerData = await dealerResponse.json().catch(() => null);
+        if (dealerResponse.ok && Array.isArray(dealerData)) {
+          setDealers(dealerData);
+        } else {
+          const reason = dealerData?.message || `Unable to load dealers (${dealerResponse.status})`;
+          loadErrors.push(`Dealers: ${/unauthorized|token expired/i.test(reason) ? "Your login session has expired. Please log in again." : reason}`);
+        }
+      } else {
+        loadErrors.push(`Dealers: ${messageOf(dealerResult.reason)}`);
+      }
+
+      setWarrantyExtensionReminders(
+        reminderResult.status === "fulfilled" ? reminderResult.value : [],
       );
+      setPendingWarrantyExtensionRequests(
+        extensionRequestResult.status === "fulfilled" ? extensionRequestResult.value : [],
+      );
+      setError(loadErrors.join(" · "));
     } catch (err) {
       console.error(err);
 
