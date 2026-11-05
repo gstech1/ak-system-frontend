@@ -2,13 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-type AuthUser = {
-  id?: string;
-  username?: string;
-  role?: string;
-  permissions?: string[];
-};
+import { getCurrentAuthUser } from "@/lib/current-user";
 
 type PermissionGuardProps = {
   permission: string;
@@ -26,14 +20,12 @@ export default function PermissionGuard({
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem("authUser");
+      const authUser = getCurrentAuthUser();
 
-      if (!storedUser) {
+      if (!authUser) {
         router.replace("/login");
         return;
       }
-
-      const authUser: AuthUser = JSON.parse(storedUser);
 
       /*
        * Dealer users must never access
@@ -44,7 +36,9 @@ export default function PermissionGuard({
         return;
       }
 
-      const permissions = authUser.permissions ?? [];
+      const permissions = Array.isArray(authUser.permissions)
+        ? authUser.permissions
+        : [];
 
       /*
        * Super Admin only:

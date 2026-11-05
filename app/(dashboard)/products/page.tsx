@@ -24,6 +24,7 @@ import {
 
 import PermissionGuard from "@/components/auth/PermissionGuard";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { getCurrentAuthUser } from "@/lib/current-user";
 
 type FormState = {
   productCode: string;
@@ -209,11 +210,9 @@ export default function ProductsPage() {
 
   useEffect(() => {
     try {
-      const authUser = JSON.parse(
-        localStorage.getItem("authUser") ?? "null",
-      );
+      const authUser = getCurrentAuthUser();
       setCanCreateProducts(
-        ["ADMIN", "MANAGER"].includes(authUser?.role),
+        ["ADMIN", "BOSS", "MANAGER"].includes(authUser?.role ?? ""),
       );
       setCanDeleteProducts(authUser?.role === "ADMIN");
     } catch {

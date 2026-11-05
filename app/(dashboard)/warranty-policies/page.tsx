@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import PermissionGuard from "@/components/auth/PermissionGuard";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { getAuthHeaders } from "@/lib/api";
 
 type WarrantyPolicy = {
   id: string;
@@ -69,6 +70,7 @@ export default function WarrantyPoliciesPage() {
 
       const response = await fetch(
         `${API_BASE_URL}/warranty-policies`,
+        { headers: { ...getAuthHeaders() }, cache: "no-store" },
       );
 
       if (!response.ok) {
@@ -262,6 +264,7 @@ export default function WarrantyPoliciesPage() {
           : "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(payload),
       });
@@ -320,6 +323,7 @@ export default function WarrantyPoliciesPage() {
         `${API_BASE_URL}/warranty-policies/${policy.id}/${action}`,
         {
           method: "PATCH",
+          headers: { ...getAuthHeaders() },
         },
       );
 

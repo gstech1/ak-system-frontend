@@ -28,6 +28,7 @@ import {
 import PermissionGuard from "@/components/auth/PermissionGuard";
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
+import { getCurrentAuthUser } from "@/lib/current-user";
 
 function formatSerial(serial: string) {
   const value = serial.replace(/\s+/g, "");
@@ -256,14 +257,11 @@ export default function SerialsPage() {
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem("authUser");
-      const authUser = storedUser
-        ? JSON.parse(storedUser)
-        : null;
+      const authUser = getCurrentAuthUser();
 
       setIsAdmin(authUser?.role === "ADMIN");
       setCanEditWarrantyType(
-        ["ADMIN", "BOSS", "MANAGER"].includes(authUser?.role),
+        ["ADMIN", "BOSS", "MANAGER"].includes(authUser?.role ?? ""),
       );
     } catch {
       setIsAdmin(false);

@@ -33,7 +33,7 @@ function getAccessToken() {
   return null;
 }
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = getAccessToken();
 
   if (!token) {
@@ -149,6 +149,9 @@ export async function getWarrantyPolicies(): Promise<
     `${API_BASE_URL}/warranty-policies`,
     {
       method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
       cache: "no-store",
     },
   );

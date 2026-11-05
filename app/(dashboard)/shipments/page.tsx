@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 
 import DashboardShell from "@/components/layout/DashboardShell";
+import { getCurrentAuthUser } from "@/lib/current-user";
 import PageTitle from "@/components/common/PageTitle";
 import { Printer } from "lucide-react";
 
@@ -171,18 +172,22 @@ export default function ShipmentsPage() {
         localStorage.getItem("accessToken");
 
       try {
-        const authUser = JSON.parse(
-          localStorage.getItem("authUser") ?? "null",
-        );
+        const authUser = getCurrentAuthUser();
+        const role = authUser?.role ?? "";
+        const permissions: string[] = Array.isArray(authUser?.permissions)
+          ? authUser.permissions
+          : [];
         setIsAdmin(authUser?.role === "ADMIN");
         setCanConfirmShipments(
-          ["ADMIN", "MANAGER", "WAREHOUSE"].includes(authUser?.role),
+          ["ADMIN", "BOSS", "MANAGER", "WAREHOUSE"].includes(role) ||
+            permissions.includes("SHIPMENTS_MANAGE"),
         );
         setCanManageServiceIssues(
-          ["ADMIN", "MANAGER", "WAREHOUSE", "SERVICE"].includes(authUser?.role),
+          ["ADMIN", "BOSS", "MANAGER", "WAREHOUSE", "SERVICE"].includes(role) ||
+            permissions.includes("SHIPMENTS_MANAGE"),
         );
         setCanDeleteDraftShipments(
-          ["ADMIN", "MANAGER"].includes(authUser?.role),
+          ["ADMIN", "MANAGER"].includes(role),
         );
       } catch {
         setIsAdmin(false);

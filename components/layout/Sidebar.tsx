@@ -9,13 +9,7 @@ import { usePathname } from "next/navigation";
 import { Truck } from "lucide-react";
 
 import { SIDEBAR_MENU } from "@/constants/menu";
-
-type AuthUser = {
-  id?: string;
-  username?: string;
-  role?: string;
-  permissions?: string[];
-};
+import { getCurrentAuthUser, type CurrentAuthUser } from "@/lib/current-user";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -27,7 +21,7 @@ export default function Sidebar() {
    * localStorage does not exist during SSR.
    */
   const [authUser, setAuthUser] =
-    useState<AuthUser | null>(null);
+    useState<CurrentAuthUser | null>(null);
 
   const [authLoaded, setAuthLoaded] =
     useState(false);
@@ -37,35 +31,7 @@ export default function Sidebar() {
    * after the component mounts.
    */
   useEffect(() => {
-    let storedUser: AuthUser | null = null;
-
-    try {
-      const rawUser = localStorage.getItem("authUser");
-      if (rawUser) {
-        const parsed = JSON.parse(rawUser);
-        if (parsed && typeof parsed === "object") {
-          storedUser = parsed;
-        }
-      }
-    } catch {
-      storedUser = null;
-    }
-
-    // Recover role and permissions from the signed token when older sessions
-    // have an incomplete authUser profile in localStorage.
-    try {
-      const token = localStorage.getItem("accessToken");
-      const payload = token?.split(".")[1];
-      if (payload) {
-        const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-        const claims = JSON.parse(atob(base64)) as AuthUser;
-        storedUser = { ...storedUser, ...claims };
-      }
-    } catch {
-      // Keep the stored profile if an older or malformed token cannot be read.
-    }
-
-    setAuthUser(storedUser);
+    setAuthUser(getCurrentAuthUser());
     setAuthLoaded(true);
   }, []);
 

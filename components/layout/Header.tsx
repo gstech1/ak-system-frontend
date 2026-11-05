@@ -4,14 +4,7 @@ import { Bell, LogOut, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useDashboardLanguage } from "@/components/layout/DashboardLanguageProvider";
-
-type AuthUser = {
-  id?: string;
-  username?: string;
-  role?: string;
-  permissions?: string[];
-  websiteManagement?: boolean;
-};
+import { getCurrentAuthUser, type CurrentAuthUser } from "@/lib/current-user";
 
 function getRoleLabel(role?: string) {
   const normalized = role?.trim().toUpperCase();
@@ -31,45 +24,16 @@ function getRoleLabel(role?: string) {
   return labels[normalized] ?? normalized;
 }
 
-function readCurrentUser(): AuthUser | null {
-  let storedUser: AuthUser = {};
-  try {
-    const rawUser = localStorage.getItem("authUser");
-    if (rawUser) {
-      const parsed = JSON.parse(rawUser);
-      if (parsed && typeof parsed === "object") storedUser = parsed;
-    }
-  } catch (error) {
-    console.error("Failed to read auth user:", error);
-  }
-
-  // The token is issued by the API and carries the authenticated role. Use it
-  // to recover missing or stale profile fields saved by an older frontend.
-  try {
-    const token = localStorage.getItem("accessToken");
-    const payload = token?.split(".")[1];
-    if (payload) {
-      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-      const claims = JSON.parse(atob(base64)) as AuthUser;
-      return { ...storedUser, ...claims };
-    }
-  } catch (error) {
-    console.error("Failed to read login token:", error);
-  }
-
-  return Object.keys(storedUser).length ? storedUser : null;
-}
-
 export default function Header() {
   const pathname = usePathname();
   const { language, setLanguage } = useDashboardLanguage();
 
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<CurrentAuthUser | null>(null);
   const [userLoaded, setUserLoaded] = useState(false);
   useEffect(() => {
     // User profile is restored from the browser session after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUser(readCurrentUser());
+    setUser(getCurrentAuthUser());
     setUserLoaded(true);
   }, []);
 
