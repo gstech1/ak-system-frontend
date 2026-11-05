@@ -119,6 +119,9 @@ export default function Header() {
 
         <button
           type="button"
+          onClick={() => { window.location.href = "/dashboard#attention-required"; }}
+          aria-label="Open dashboard reminders and pending actions"
+          title="Dashboard reminders and pending actions"
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 transition hover:bg-slate-100"
         >
           <Bell size={18} />

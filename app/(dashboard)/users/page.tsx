@@ -31,6 +31,7 @@ import {
 import DashboardShell from "@/components/layout/DashboardShell";
 
 import PageTitle from "@/components/common/PageTitle";
+import { getCurrentAuthUser } from "@/lib/current-user";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001"
@@ -42,7 +43,13 @@ type UserRole =
 
   | "ADMIN"
 
+  | "BOSS"
+
   | "MANAGER"
+
+  | "SALES"
+
+  | "MARKETING"
 
   | "WAREHOUSE"
 
@@ -97,6 +104,8 @@ export default function UsersPage() {
 
 
   const [users, setUsers] = useState<User[]>([]);
+
+  const [currentRole, setCurrentRole] = useState<UserRole | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -284,9 +293,39 @@ const [editingUser, setEditingUser] = useState<User | null>(null);
 
     useEffect(() => {
 
+  const role = getCurrentAuthUser()?.role?.trim().toUpperCase();
+
+  if (role && ["ADMIN", "BOSS", "MANAGER", "SALES", "MARKETING", "WAREHOUSE", "SERVICE", "DEALER"].includes(role)) {
+
+    setCurrentRole(role as UserRole);
+
+  }
+
   loadUsers();
 
 }, []);
+
+
+  function canManageUser(target: User) {
+
+    if (!currentRole || target.role === "ADMIN") return false;
+
+    if (currentRole === "ADMIN") return true;
+
+    const levels: Record<UserRole, number> = {
+      ADMIN: 4,
+      BOSS: 3,
+      MANAGER: 2,
+      SALES: 1,
+      MARKETING: 1,
+      WAREHOUSE: 1,
+      SERVICE: 1,
+      DEALER: 1,
+    };
+
+    return levels[currentRole] > levels[target.role];
+
+  }
 
 
 
@@ -691,9 +730,21 @@ async function handleStatusChange(
 
         return "Super Admin";
 
+      case "BOSS":
+
+        return "Boss";
+
       case "MANAGER":
 
         return "Manager";
+
+      case "SALES":
+
+        return "Sales";
+
+      case "MARKETING":
+
+        return "Marketing";
 
       case "WAREHOUSE":
 
@@ -729,9 +780,18 @@ async function handleStatusChange(
 
         return "bg-purple-100 text-purple-700";
 
+      case "BOSS":
+
+        return "bg-indigo-100 text-indigo-700";
+
       case "MANAGER":
 
         return "bg-blue-100 text-blue-700";
+
+      case "SALES":
+      case "MARKETING":
+
+        return "bg-sky-100 text-sky-700";
 
       case "WAREHOUSE":
 
@@ -1517,7 +1577,7 @@ function openEditUser(user: User) {
 
                        <td className="px-5 py-4">
 
-  <button
+  {canManageUser(user) && <button
 
     type="button"
 
@@ -1579,7 +1639,7 @@ function openEditUser(user: User) {
 
     {user.status}
 
-  </button>
+  </button>}
 
 </td>
 
@@ -1601,7 +1661,7 @@ function openEditUser(user: User) {
 
                           <div className="flex justify-end gap-2">
 
-                            <button
+                            {canManageUser(user) && <button
 
   type="button"
 
@@ -1615,11 +1675,11 @@ function openEditUser(user: User) {
 
   Edit
 
-</button>
+</button>}
 
 
 
-                            <button
+                            {canManageUser(user) && <button
 
   type="button"
 
@@ -1635,7 +1695,7 @@ function openEditUser(user: User) {
 
   Permissions
 
-</button>
+</button>}
 
                           </div>
 
