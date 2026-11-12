@@ -59,10 +59,12 @@ export default function ProductListPage() {
     try {
       setLoading(true);
       setErrorMessage("");
+      const accessToken = localStorage.getItem("accessToken");
 
       const response = await fetch(
         `${API_URL}/other-products`,
         {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           cache: "no-store",
         },
       );

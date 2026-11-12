@@ -159,6 +159,8 @@ export default function ProductRegisterPage() {
     setSaving(true);
 
     try {
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) throw new Error("Login session not found. Please sign in again.");
       const response =
         await fetch(
           `${API_URL}/other-products`,
@@ -168,6 +170,7 @@ export default function ProductRegisterPage() {
             headers: {
               "Content-Type":
                 "application/json",
+              Authorization: `Bearer ${accessToken}`,
             },
 
             body: JSON.stringify({

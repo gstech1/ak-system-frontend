@@ -46,6 +46,7 @@ interface Product {
 interface SalesItem {
   product: Product;
   quantity: number;
+  barcodes?: string[];
 }
 
 interface StockOutRecord {
@@ -152,11 +153,16 @@ const [historyVisibleCount, setHistoryVisibleCount] =
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
     async function loadProducts() {
       try {
         const response = await fetch(
           `${API_URL}/other-products`,
           {
+            headers: authHeaders,
             cache: "no-store",
           },
         );
@@ -192,6 +198,7 @@ async function loadStockOutHistory() {
     const response = await fetch(
       `${API_URL}/stock-out`,
       {
+        headers: authHeaders,
         cache: "no-store",
       },
     );
@@ -231,7 +238,7 @@ async function loadStockOutHistory() {
     );
   }
 
-  function addProduct() {
+  async function addProduct() {
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -250,19 +257,40 @@ async function loadStockOutHistory() {
         code.toLowerCase(),
     );
 
-    if (!product) {
-      setErrorMessage(
-        `Product not found: ${code}`,
-      );
+    if (product?.trackingType === "UNIT") {
+      setErrorMessage(`Scan the individual unit barcode for ${product.productCode}; scanning its product code is not enough.`);
       return;
     }
 
-    const stock =
-      getAvailableStock(product);
+    let selectedProduct = product;
+    if (!selectedProduct) {
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setErrorMessage("Login session not found. Please login again.");
+        return;
+      }
+      try {
+        const response = await fetch(`${API_URL}/stock-out/barcode/${encodeURIComponent(code)}`, {
+          headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.otherProduct) throw new Error(data?.message || `Product or available unit barcode not found: ${code}`);
+        selectedProduct = products.find((entry) => entry.id === data.otherProduct.id);
+        if (!selectedProduct) throw new Error(`Product not found in the current product list: ${code}`);
+        if (selectedProduct.trackingType !== "UNIT") throw new Error("Scan the product code for quantity tracked items.");
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : `Unable to verify barcode: ${code}`);
+        return;
+      }
+    }
+
+    const resolvedProduct = selectedProduct;
+
+    const stock = getAvailableStock(resolvedProduct);
 
     if (stock <= 0) {
       setErrorMessage(
-        `${product.productName} has no available stock in MTK Solar Main Warehouse.`,
+        `${resolvedProduct.productName} has no available stock in MTK Solar Main Warehouse.`,
       );
       return;
     }
@@ -270,27 +298,29 @@ async function loadStockOutHistory() {
     const existing = items.find(
       (item) =>
         item.product.id ===
-        product.id,
+        resolvedProduct.id,
     );
 
     if (
-      product.trackingType ===
+      resolvedProduct.trackingType ===
       "UNIT"
     ) {
-      if (existing) {
+      const scannedBarcode = code;
+      if (items.some((item) => item.barcodes?.includes(scannedBarcode))) {
         setErrorMessage(
-          `${product.productCode} is already added.`,
+          `Barcode ${scannedBarcode} is already added.`,
         );
         return;
       }
-
-      setItems([
-        ...items,
-        {
-          product,
-          quantity: 1,
-        },
-      ]);
+      if ((existing?.quantity || 0) + 1 > stock) {
+        setErrorMessage(`Insufficient stock. Available: ${stock}`);
+        return;
+      }
+      setItems(existing
+        ? items.map((item) => item.product.id === resolvedProduct.id
+          ? { ...item, quantity: item.quantity + 1, barcodes: [...(item.barcodes || []), scannedBarcode] }
+          : item)
+        : [...items, { product: resolvedProduct, quantity: 1, barcodes: [scannedBarcode] }]);
     } else {
       const requestedQuantity =
         Math.max(
@@ -316,7 +346,7 @@ async function loadStockOutHistory() {
         setItems(
           items.map((item) =>
             item.product.id ===
-            product.id
+            resolvedProduct.id
               ? {
                   ...item,
                   quantity:
@@ -330,7 +360,7 @@ async function loadStockOutHistory() {
         setItems([
           ...items,
           {
-            product,
+          product: resolvedProduct,
             quantity:
               requestedQuantity,
           },
@@ -504,17 +534,17 @@ async function loadStockOutHistory() {
                 remark.trim() ||
                 undefined,
               createdById,
-              items: items.map(
-                (item) => ({
-                  productId:
-                    item.product.id,
-                  barcode:
-                    item.product
-                      .productCode,
-                  quantity:
-                    item.quantity,
-                }),
-              ),
+              items: items.flatMap((item) => item.product.trackingType === "UNIT"
+                ? (item.barcodes || []).map((unitBarcode) => ({
+                    productId: item.product.id,
+                    barcode: unitBarcode,
+                    quantity: 1,
+                  }))
+                : [{
+                    productId: item.product.id,
+                    barcode: item.product.productCode,
+                    quantity: item.quantity,
+                  }]),
             }),
           },
         );
@@ -551,6 +581,7 @@ setRemark("");
         await fetch(
           `${API_URL}/other-products`,
           {
+            headers: { Authorization: `Bearer ${token}` },
             cache: "no-store",
           },
         );
@@ -1398,15 +1429,7 @@ setRemark("");
 
     <td className="px-5 py-4">
       {(() => {
-        const availableStock =
-          item.product.stockBalances?.reduce(
-            (total, balance) =>
-              total +
-              Number(
-                balance.quantity || 0,
-              ),
-            0,
-          ) ?? 0;
+        const availableStock = getAvailableStock(item.product);
 
         return (
           <div className="flex flex-col items-start gap-1.5">
@@ -1414,7 +1437,7 @@ setRemark("");
               .trackingType ===
             "UNIT" ? (
               <span className="inline-flex min-w-10 justify-center rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
-                1
+                {item.quantity}
               </span>
             ) : (
               <input
@@ -1446,6 +1469,11 @@ setRemark("");
                 {item.product.unit}
               </span>
             </span>
+            {item.barcodes?.length ? (
+              <span className="max-w-56 break-all text-[11px] text-slate-500">
+                Serials: {item.barcodes.join(", ")}
+              </span>
+            ) : null}
           </div>
         );
       })()}

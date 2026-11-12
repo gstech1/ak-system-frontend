@@ -125,10 +125,12 @@ export default function StockOutPage() {
   async function loadHistory() {
     try {
       setHistoryLoading(true);
+      const token = localStorage.getItem("accessToken");
 
       const response = await fetch(
         `${API_URL}/stock-out`,
         {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         },
       );
@@ -159,10 +161,12 @@ export default function StockOutPage() {
   async function loadProducts() {
     try {
       setProductsLoading(true);
+      const token = localStorage.getItem("accessToken");
 
       const response = await fetch(
         `${API_URL}/other-products`,
         {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         },
       );
@@ -426,6 +430,8 @@ export default function StockOutPage() {
 
     try {
       setSubmitting(true);
+      const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Login session not found. Please login again.");
 
       const response = await fetch(
         `${API_URL}/stock-out`,
@@ -433,6 +439,7 @@ export default function StockOutPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             warehouseId,
