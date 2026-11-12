@@ -50,10 +50,12 @@ export default function ProductDetailPage({
     async function loadProduct() {
       try {
         const { id } = await params;
+        const accessToken = localStorage.getItem("accessToken");
 
         const response = await fetch(
           `${API_URL}/other-products/${id}`,
           {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
             cache: "no-store",
           },
         );

@@ -105,9 +105,11 @@ export default function ServiceIssuePage() {
 
   async function loadProducts() {
     try {
+      const token = localStorage.getItem("accessToken");
       const response = await fetch(
         `${API_URL}/other-products`,
         {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         },
       );
@@ -138,10 +140,12 @@ export default function ServiceIssuePage() {
   async function loadHistory() {
     try {
       setHistoryLoading(true);
+      const token = localStorage.getItem("accessToken");
 
       const response = await fetch(
         `${API_URL}/service-issue`,
         {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         },
       );
@@ -219,6 +223,12 @@ export default function ServiceIssuePage() {
     }
 
     setSearching(true);
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      setErrorMessage("Login session not found. Please login again.");
+      setSearching(false);
+      return;
+    }
 
     let scannedUnit: { barcode: string; status: string } | null = null;
     let product = products.find(
@@ -233,7 +243,7 @@ export default function ServiceIssuePage() {
     try {
       const stockResponse = await fetch(
         `${API_URL}/warehouse-stock/barcode/${encodeURIComponent(code)}?warehouseId=${MTK_SOLAR_WAREHOUSE_ID}`,
-        { cache: "no-store" },
+        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
       );
       if (stockResponse.ok) {
         const stockData = await stockResponse.json();

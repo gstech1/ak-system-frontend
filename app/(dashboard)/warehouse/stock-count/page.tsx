@@ -104,11 +104,13 @@ export default function StockCountPage() {
   const loadStock = async () => {
     try {
       setError("");
+      const token = localStorage.getItem("accessToken");
 
       const response = await fetch(
        `${API_BASE_URL}/warehouse-stock?warehouseCode=MTK-MAIN`,
         {
           method: "GET",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           cache: "no-store",
         },
       );
@@ -145,7 +147,8 @@ export default function StockCountPage() {
 
   async function loadStockCounts() {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock-count?warehouseId=${MTK_SOLAR_WAREHOUSE_ID}`, { cache: "no-store" });
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`${API_BASE_URL}/stock-count?warehouseId=${MTK_SOLAR_WAREHOUSE_ID}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" });
       const data = await response.json();
       if (response.ok) setStockCounts(Array.isArray(data) ? data : []);
     } catch (err) { console.error("Unable to load stock count history", err); }
