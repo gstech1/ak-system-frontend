@@ -926,6 +926,28 @@ export interface DashboardActivity {
 export interface DashboardSummary {
   products: {
     total: number;
+    inventory: Array<{
+      id: string;
+      productCode: string;
+      modelCode: string;
+      name: string;
+      category: string;
+      poles?: number | null;
+      ratedCurrent?: string | null;
+      ratedVoltage?: string | null;
+      breakingCapacity?: string | null;
+      serials: {
+        total: number;
+        inStock: number;
+        shipped: number;
+        registered: number;
+        returned: number;
+        replaced: number;
+        rejectPending: number;
+        rejected: number;
+        serviceIssued: number;
+      };
+    }>;
   };
 
   serials: {
