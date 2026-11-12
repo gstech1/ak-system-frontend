@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const API_BASE_URL = (
@@ -16,6 +16,14 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionMessage, setSessionMessage] = useState("");
+
+  useEffect(() => {
+    if (sessionStorage.getItem("swmsSessionEndedByIdle") === "1") {
+      sessionStorage.removeItem("swmsSessionEndedByIdle");
+      setSessionMessage("အသုံးမပြုဘဲ ၁ နာရီပြည့်သွားသောကြောင့် ထွက်လိုက်ပါပြီ။ ဆက်သုံးရန် ပြန်ဝင်ပါ။");
+    }
+  }, []);
 
   async function handleLogin(
     event: FormEvent<HTMLFormElement>,
@@ -68,6 +76,7 @@ export default function LoginPage() {
         "accessToken",
         data.accessToken,
       );
+      localStorage.setItem("swmsLastActivityAt", String(Date.now()));
 
       if (data.user) {
         localStorage.setItem(
@@ -115,6 +124,12 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-slate-500">
             Enter your account credentials.
           </p>
+
+          {sessionMessage && (
+            <div role="status" className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+              {sessionMessage}
+            </div>
+          )}
 
           {error && (
             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
