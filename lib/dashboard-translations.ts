@@ -75,6 +75,29 @@ Object.assign(MY_TRANSLATIONS, {
 });
 
 Object.assign(MY_TRANSLATIONS, {
+  "Product Serial Stock": "ကုန်ပစ္စည်းအလိုက် စက်အမှတ်စဉ်လက်ကျန်",
+  "Open to see serial quantities for each product in Serial Management.": "Serial Management ထဲရှိ ကုန်ပစ္စည်းတစ်မျိုးချင်း၏ အရေအတွက်ကို ဖွင့်ကြည့်ပါ။",
+  "product types": "မျိုး",
+  "In-stock quantity is shown first. Other serial statuses are listed separately.": "လက်ကျန်အရေအတွက်ကို အရင်ပြထားပြီး အခြားအခြေအနေရှိ စက်အမှတ်စဉ်များကို သီးခြားဖော်ပြထားသည်။",
+  "Search product code, name, or rating...": "ကုန်ပစ္စည်းကုဒ်၊ အမည် သို့မဟုတ် သတ်မှတ်ချက်ဖြင့် ရှာရန်...",
+  "Loading product quantities...": "ကုန်ပစ္စည်းအရေအတွက်များ ဖွင့်နေသည်...",
+  "Unable to load product quantities.": "ကုန်ပစ္စည်းအရေအတွက်များကို ဖွင့်မရပါ။",
+  "No matching products found.": "ကိုက်ညီသော ကုန်ပစ္စည်း မတွေ့ပါ။",
+  "Total Serials": "စက်အမှတ်စဉ်စုစုပေါင်း",
+  "In Stock": "လက်ကျန်",
+  "Shipped": "ပို့ပြီး",
+  "Registered": "စာရင်းသွင်းပြီး",
+  "Service Issued": "Service အတွက်ထုတ်ပေးပြီး",
+  "Returned": "ပြန်လက်ခံပြီး",
+  "Replaced": "အစားထိုးပြီး",
+  "Reject Pending": "ပယ်ချရန်စောင့်ဆိုင်းဆဲ",
+  "Rejected": "ပယ်ချပြီး",
+  "Showing": "ပြသနေသည်",
+  "of": "ထဲမှ",
+  "product types.": "မျိုး။",
+});
+
+Object.assign(MY_TRANSLATIONS, {
   "(Stock:": "(လက်ကျန်:",
   ". Its serial assignments are complete.": ". စက်အမှတ်စဉ်အားလုံး သတ်မှတ်ပြီးပါပြီ။",
   "1 × 1 inch (25.4 × 25.4 mm)": "1 × 1 inch (25.4 × 25.4 mm)",

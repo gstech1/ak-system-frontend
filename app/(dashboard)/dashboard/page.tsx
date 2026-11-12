@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [canViewRecentActivity, setCanViewRecentActivity] = useState(false);
   const [extensionReminders, setExtensionReminders] = useState<WarrantyExtensionReminder[]>([]);
   const [pendingExtensionRequests, setPendingExtensionRequests] = useState<WarrantyExtensionRequest[]>([]);
+  const [productSearch, setProductSearch] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +102,22 @@ export default function DashboardPage() {
     return new Date(createdAt).toLocaleString();
   };
 
+  const productInventory = summary?.products.inventory ?? [];
+  const visibleProducts = productInventory.filter((product) => {
+    const query = productSearch.trim().toLowerCase();
+    if (!query) return true;
+    return [
+      product.productCode,
+      product.modelCode,
+      product.name,
+      product.category,
+      product.ratedCurrent,
+      product.ratedVoltage,
+      product.breakingCapacity,
+      product.poles == null ? "" : `${product.poles}p`,
+    ].some((value) => value?.toLowerCase().includes(query));
+  });
+
   return (
     <DashboardShell>
       <PageTitle
@@ -169,6 +187,87 @@ export default function DashboardPage() {
           />
         </div>
       </section>
+
+      {/* Product serial stock breakdown */}
+      <details className="group mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Product Serial Stock</h2>
+            <p className="mt-1 text-sm text-slate-500">Open to see serial quantities for each product in Serial Management.</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
+            {loading ? "—" : productInventory.length} <span>product types</span>
+          </span>
+          <ChevronDown size={20} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+        </summary>
+
+        <div className="border-t border-slate-200 p-4 sm:p-6">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">In-stock quantity is shown first. Other serial statuses are listed separately.</p>
+            <input
+              type="search"
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+              placeholder="Search product code, name, or rating..."
+              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 sm:max-w-sm"
+            />
+          </div>
+
+          {loading ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Loading product quantities...</div>
+          ) : error ? (
+            <div className="rounded-xl bg-red-50 px-4 py-6 text-center text-sm font-medium text-red-700">Unable to load product quantities.</div>
+          ) : visibleProducts.length === 0 ? (
+            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">No matching products found.</div>
+          ) : (
+            <div className="max-h-[32rem] overflow-auto rounded-xl border border-slate-200">
+              <table className="min-w-[1180px] w-full border-collapse text-left text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3 text-right">Total Serials</th>
+                    <th className="px-4 py-3 text-right">In Stock</th>
+                    <th className="px-3 py-3 text-right">Shipped</th>
+                    <th className="px-3 py-3 text-right">Registered</th>
+                    <th className="px-3 py-3 text-right">Service Issued</th>
+                    <th className="px-3 py-3 text-right">Returned</th>
+                    <th className="px-3 py-3 text-right">Replaced</th>
+                    <th className="px-3 py-3 text-right">Reject Pending</th>
+                    <th className="px-3 py-3 text-right">Rejected</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visibleProducts.map((product) => (
+                    <tr key={product.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-900">{product.productCode} · {product.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {[product.modelCode, product.category, product.poles == null ? null : `${product.poles}P`, product.ratedCurrent, product.ratedVoltage, product.breakingCapacity].filter(Boolean).join(" · ")}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-700">{product.serials.total}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="inline-flex min-w-10 justify-center rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">{product.serials.inStock}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.shipped}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.registered}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.serviceIssued}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.returned}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.replaced}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.rejectPending}</td>
+                      <td className="px-3 py-3 text-right text-slate-600">{product.serials.rejected}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!loading && !error && productSearch.trim() && (
+            <p className="mt-3 text-xs text-slate-500"><span>Showing</span> {visibleProducts.length} <span>of</span> {productInventory.length} <span>product types.</span></p>
+          )}
+        </div>
+      </details>
 
       {/* Attention Required */}
       <section id="attention-required" className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
