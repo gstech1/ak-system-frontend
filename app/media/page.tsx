@@ -2,10 +2,12 @@
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
+import IdleLogoutMonitor from "@/components/layout/IdleLogoutMonitor";
 
 export default function MediaLibraryPage() {
   return (
     <DashboardShell>
+      <IdleLogoutMonitor />
       <PageTitle
         title="Media Library"
         subtitle="Manage website images, videos and media assets."

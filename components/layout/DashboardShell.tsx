@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import MTKSolarSidebar from "./MTKSolarSidebar";
-import IdleLogoutMonitor from "./IdleLogoutMonitor";
 import { getCurrentAuthUser, type CurrentAuthUser } from "@/lib/current-user";
 
 type DashboardShellProps = {
@@ -37,7 +36,6 @@ export default function DashboardShell({
 
   return (
     <div className="flex h-screen bg-slate-100">
-      <IdleLogoutMonitor />
       {isMTKSolarWarehouse ? (
         <MTKSolarSidebar />
       ) : (
