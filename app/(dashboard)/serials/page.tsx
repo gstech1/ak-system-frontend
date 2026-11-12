@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   type FormEvent,
   useCallback,
   useEffect,
@@ -162,6 +163,11 @@ export default function SerialsPage() {
   const [totalPages, setTotalPages] = useState(0);
 
   const [search, setSearch] = useState("");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [rangeStartInput, setRangeStartInput] = useState("");
+  const [rangeEndInput, setRangeEndInput] = useState("");
   const [status, setStatus] = useState("");
 
   /* ======================================================
@@ -225,6 +231,8 @@ export default function SerialsPage() {
           search,
           "",
           status,
+          rangeStart,
+          rangeEnd,
         ),
         getProducts(),
         getWarrantyPolicies(),
@@ -252,8 +260,33 @@ export default function SerialsPage() {
   }, [
     page,
     search,
+    rangeStart,
+    rangeEnd,
     status,
   ]);
+
+  function applySerialFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (Boolean(rangeStartInput.trim()) !== Boolean(rangeEndInput.trim())) {
+      setError("Enter both the first and last serial number for a range search.");
+      return;
+    }
+    setError("");
+    setPage(1);
+    setSearch(searchInput.trim());
+    setRangeStart(rangeStartInput.trim());
+    setRangeEnd(rangeEndInput.trim());
+  }
+
+  function clearSerialFilters() {
+    setSearchInput("");
+    setRangeStartInput("");
+    setRangeEndInput("");
+    setSearch("");
+    setRangeStart("");
+    setRangeEnd("");
+    setPage(1);
+  }
 
   useEffect(() => {
     try {
@@ -1174,6 +1207,36 @@ export default function SerialsPage() {
     <h2 className="font-bold text-slate-900">
       Serial List
     </h2>
+    <form onSubmit={applySerialFilters} className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto_auto]">
+      <input
+        value={searchInput}
+        onChange={(event) => setSearchInput(event.target.value)}
+        placeholder="Search one serial number..."
+        aria-label="Search one serial number"
+        className="h-11 rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500"
+      />
+      <input
+        value={rangeStartInput}
+        onChange={(event) => setRangeStartInput(event.target.value)}
+        placeholder="Start serial number"
+        aria-label="Start serial number"
+        className="h-11 rounded-xl border border-slate-300 px-3 font-mono text-sm outline-none focus:border-emerald-500"
+      />
+      <input
+        value={rangeEndInput}
+        onChange={(event) => setRangeEndInput(event.target.value)}
+        placeholder="End serial number"
+        aria-label="End serial number"
+        className="h-11 rounded-xl border border-slate-300 px-3 font-mono text-sm outline-none focus:border-emerald-500"
+      />
+      <button type="submit" className="h-11 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700">
+        Search
+      </button>
+      <button type="button" onClick={clearSerialFilters} className="h-11 rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        Clear
+      </button>
+    </form>
+    <p className="mt-2 text-xs text-slate-500">Range search includes both the start and end serial numbers.</p>
   </div>
 
   {loading ? (
@@ -1182,7 +1245,7 @@ export default function SerialsPage() {
     </div>
   ) : serials.length === 0 ? (
     <div className="p-10 text-center text-sm text-slate-500">
-      No serial numbers registered yet.
+      {search || rangeStart || rangeEnd ? "No serial numbers match this search." : "No serial numbers registered yet."}
     </div>
   ) : (
     <div className="overflow-x-auto">
@@ -1395,6 +1458,28 @@ export default function SerialsPage() {
             })}
         </tbody>
       </table>
+    </div>
+  )}
+  {!loading && totalPages > 0 && (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+      <p className="text-sm text-slate-600">
+        Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-40">Previous</button>
+        {Array.from(new Set([1, page - 2, page - 1, page, page + 1, page + 2, totalPages]))
+          .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages)
+          .sort((a, b) => a - b)
+          .map((pageNumber, index, pages) => (
+            <Fragment key={pageNumber}>
+              {index > 0 && pageNumber - pages[index - 1] > 1 && <span className="px-1 text-slate-400">…</span>}
+              <button type="button" onClick={() => setPage(pageNumber)} aria-current={page === pageNumber ? "page" : undefined} className={`min-w-10 rounded-lg border px-3 py-2 text-sm ${page === pageNumber ? "border-emerald-600 bg-emerald-600 font-bold text-white" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>
+                {pageNumber}
+              </button>
+            </Fragment>
+          ))}
+        <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages} className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-40">Next</button>
+      </div>
     </div>
   )}
 </div>

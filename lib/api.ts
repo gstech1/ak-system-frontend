@@ -524,6 +524,8 @@ export async function getSerials(
   search = "",
   productId = "",
   status = "",
+    startSerial = "",
+    endSerial = "",
 ): Promise<SerialListResponse> {
   const params = new URLSearchParams();
 
@@ -533,6 +535,14 @@ export async function getSerials(
   if (search.trim()) {
     params.set("search", search.trim());
   }
+
+    if (startSerial.trim()) {
+      params.set("startSerial", startSerial.trim());
+    }
+
+    if (endSerial.trim()) {
+      params.set("endSerial", endSerial.trim());
+    }
 
   if (productId.trim()) {
     params.set("productId", productId.trim());
