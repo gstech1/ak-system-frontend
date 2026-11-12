@@ -65,6 +65,7 @@ export default function Header({ authUser, authLoaded }: HeaderProps = {}) {
   function handleLogout() {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("authUser");
+    localStorage.removeItem("swmsLastActivityAt");
     window.location.href = "/login";
   }
 
