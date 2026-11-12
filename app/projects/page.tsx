@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
+import IdleLogoutMonitor from "@/components/layout/IdleLogoutMonitor";
 import PageTitle from "@/components/common/PageTitle";
 import {
   getWebsiteProjects,
@@ -50,6 +51,7 @@ export default function ProjectsPage() {
 
   return (
     <DashboardShell>
+      <IdleLogoutMonitor />
       <PageTitle
         title="Projects"
         subtitle="Manage the projects displayed on the website."

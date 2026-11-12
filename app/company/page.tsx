@@ -2,10 +2,12 @@
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
+import IdleLogoutMonitor from "@/components/layout/IdleLogoutMonitor";
 
 export default function CompanyPage() {
   return (
     <DashboardShell>
+      <IdleLogoutMonitor />
       <PageTitle
         title="Company"
         subtitle="Manage company information and profile content."

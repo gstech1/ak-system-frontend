@@ -21,7 +21,10 @@ export default function LoginPage() {
   useEffect(() => {
     if (sessionStorage.getItem("swmsSessionEndedByIdle") === "1") {
       sessionStorage.removeItem("swmsSessionEndedByIdle");
-      setSessionMessage("အသုံးမပြုဘဲ ၁ နာရီပြည့်သွားသောကြောင့် ထွက်လိုက်ပါပြီ။ ဆက်သုံးရန် ပြန်ဝင်ပါ။");
+      const timer = window.setTimeout(() => {
+        setSessionMessage("အသုံးမပြုဘဲ ၁ နာရီပြည့်သွားသောကြောင့် ထွက်လိုက်ပါပြီ။ ဆက်သုံးရန် ပြန်ဝင်ပါ။");
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, []);
 
