@@ -355,7 +355,7 @@ export default function StockCountPage() {
     const surplusCount = checkedList.filter((item) => getDifference(item) > 0).length;
     printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Suntree Stock Count</title><style>
       @page{size:A4 portrait;margin:14mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#172033}h1{margin:0;font-size:22px}.sub{color:#64748b;margin:5px 0 18px}.summary{display:flex;gap:18px;margin:0 0 16px;padding:12px;border:1px solid #cbd5e1;border-radius:6px}.summary strong{display:block;margin-top:4px}.bad{color:#b91c1c}.good{color:#047857}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#f1f5f9;font-size:10px;text-transform:uppercase}.num{text-align:center;font-weight:700}.short{color:#b91c1c}.surplus{color:#c2410c}.footer{margin-top:18px;color:#64748b;font-size:10px}@media print{tr{break-inside:avoid}}
-      </style></head><body><h1>Suntree Myanmar · Stock Count Report</h1><p class="sub">Printed ${escapeHtml(new Date().toLocaleString())} · ${checkedList.length} checked product(s)</p><div class="summary"><div>Shortage<strong class="bad">${shortageCount} product(s)</strong></div><div>Surplus<strong>${surplusCount} product(s)</strong></div><div>Not fully checked<strong>${remainingProducts.length} product(s)</strong></div><div>Checked quantity<strong>${checkedQuantity}</strong></div></div><table><thead><tr><th>No.</th><th>Product code</th><th>Product</th><th>Tracking</th><th>System</th><th>Counted</th><th>Difference</th></tr></thead><tbody>${rows}</tbody></table><p class="footer">Difference = counted quantity − system quantity. Negative values indicate shortage.</p></body></html>`);
+      </style></head><body><h1>Suntree Myanmar · Stock Count Report</h1><p class="sub">Printed ${escapeHtml(new Date().toLocaleString())} · ${checkedList.length} checked product(s)</p><div class="summary"><div>Shortage<strong class="bad">${shortageCount} product(s)</strong></div><div>Surplus<strong>${surplusCount} product(s)</strong></div><div>Product types with stock remaining<strong>${remainingProducts.length} product(s)</strong></div><div>Checked quantity<strong>${checkedQuantity}</strong></div></div><table><thead><tr><th>No.</th><th>Product code</th><th>Product</th><th>Tracking</th><th>System</th><th>Counted</th><th>Difference</th></tr></thead><tbody>${rows}</tbody></table><p class="footer">Difference = counted quantity − system quantity. Negative values indicate shortage.</p></body></html>`);
     printWindow.document.close();
     printWindow.focus();
     printWindow.onload = () => window.setTimeout(() => printWindow.print(), 200);
@@ -548,13 +548,15 @@ export default function StockCountPage() {
 
                 </div>
 
-                <button
-                  type="button"
-                  onClick={clearCheckData}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Clear Check
-                </button>
+                {checkedQuantity > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearCheckData}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Clear Check
+                  </button>
+                )}
 
               </div>
 
@@ -649,6 +651,13 @@ export default function StockCountPage() {
                 </div>
               )}
 
+              {checkedQuantity === 0 ? (
+                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
+                  Stock count has not started. Scan a barcode or check a serial range to begin.
+                </div>
+              ) : (
+                <>
+
               {/* CHECK SUMMARY */}
 
               <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -680,7 +689,7 @@ export default function StockCountPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
 
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Not Fully Checked
+                    Product Types Remaining
                   </p>
 
                   <p className="mt-1 text-2xl font-bold text-orange-600">
@@ -865,11 +874,11 @@ export default function StockCountPage() {
                 <div className="mb-3">
 
                   <h3 className="font-bold text-slate-900">
-                    Remaining / Not Fully Checked
+                    Remaining Products
                   </h3>
 
                   <p className="text-xs text-slate-500">
-                    In-stock serials not scanned yet.
+                    In-stock serials not scanned yet; each row is one product type.
                   </p>
 
                 </div>
@@ -987,6 +996,9 @@ export default function StockCountPage() {
                 )}
 
               </div>
+
+                </>
+              )}
 
             </div>
 
