@@ -13,6 +13,19 @@ export const MY_TRANSLATIONS: Record<string, string> = {
 };
 
 Object.assign(MY_TRANSLATIONS, {
+  "Add a Serial Range": "စက်အမှတ်စဉ် အပိုင်းအခြားထည့်ရန်",
+  "Start Serial": "စတင်စက်အမှတ်စဉ်",
+  "End Serial": "နောက်ဆုံးစက်အမှတ်စဉ်",
+  "Add Range": "အပိုင်းအခြားထည့်ရန်",
+  "Serial range must contain exactly 9 digits at both ends.": "စက်အမှတ်စဉ်အစနှင့်အဆုံး နှစ်ခုစလုံးတွင် ဂဏန်း ၉ လုံး အတိအကျဖြည့်ပါ။",
+  "Each range can add up to 100 serials. Split larger ranges into multiple ranges.": "အပိုင်းအခြားတစ်ခုလျှင် စက်အမှတ်စဉ် ၁၀၀ အထိ ထည့်နိုင်သည်။ ပိုများပါက အပိုင်းအခြားများခွဲထည့်ပါ။",
+  "A shipment can contain up to 1,000 serials.": "ဘောက်ချာတစ်စောင်တွင် စက်အမှတ်စဉ် ၁,၀၀၀ အထိ ထည့်နိုင်သည်။",
+  "All serials in this range are already in the shipment.": "ဤအပိုင်းအခြားထဲရှိ စက်အမှတ်စဉ်များအားလုံးကို ဘောက်ချာထဲ ထည့်ပြီးဖြစ်သည်။",
+  "Serial range added. Check the count before shipment.": "စက်အမှတ်စဉ်အပိုင်းအခြား ထည့်ပြီးပါပြီ။ မပို့မီ အရေအတွက်ကို စစ်ပါ။",
+  "Add up to 100 consecutive serials per range. Add more ranges to the same shipment; maximum 1,000 serials per shipment.": "အပိုင်းအခြားတစ်ခုလျှင် ဆက်တိုက်စက်အမှတ်စဉ် ၁၀၀ အထိ ထည့်ပါ။ ဘောက်ချာတစ်စောင်တည်းတွင် အပိုင်းအခြားများ ထပ်ထည့်နိုင်ပြီး စုစုပေါင်း ၁,၀၀၀ အထိဖြစ်သည်။",
+});
+
+Object.assign(MY_TRANSLATIONS, {
   "ADMIN": "စီမံခန့်ခွဲသူ",
   "ADMINISTRATOR": "စီမံခန့်ခွဲသူ",
   "MANAGER": "မန်နေဂျာ",
