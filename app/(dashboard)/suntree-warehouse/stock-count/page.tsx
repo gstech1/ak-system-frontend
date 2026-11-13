@@ -8,14 +8,10 @@ import {
   Barcode,
   CheckCircle2,
   ClipboardCheck,
-  Eye,
-  EyeOff,
-  Package,
   Printer,
   RefreshCw,
   Search,
   ScanLine,
-  X,
 } from "lucide-react";
 
 const API_BASE_URL = (
@@ -23,33 +19,8 @@ const API_BASE_URL = (
   "http://localhost:5001"
 ).replace(/\/+$/, "");
 
-type WarehouseStock = {
-  id: string;
-  warehouseId: string;
-  productId: string;
-  quantity: number;
-
-  warehouse: {
-    id: string;
-    warehouseCode: string;
-    warehouseName: string;
-  };
-
-  product: {
-    id: string;
-    productCode: string;
-    productName: string;
-    category: string | null;
-    brand: string | null;
-    model: string | null;
-    unit: string;
-    trackingType: string;
-  };
-};
-
 type CheckedProduct = {
   productId: string;
-  stockId: string;
   productCode: string;
   productName: string;
   trackingType: string;
@@ -59,20 +30,12 @@ type CheckedProduct = {
 };
 
 export default function StockCountPage() {
-  const [stocks, setStocks] = useState<WarehouseStock[]>([]);
   const [serialInventory, setSerialInventory] = useState<DashboardSummary["products"]["inventory"]>([]);
   const [serialInventoryLoading, setSerialInventoryLoading] = useState(true);
   const [serialInventoryError, setSerialInventoryError] = useState("");
 
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
-
-  const [showStockList, setShowStockList] =
-    useState(true);
 
   const [stockCheckOpen, setStockCheckOpen] =
     useState(false);
@@ -82,63 +45,14 @@ export default function StockCountPage() {
   const [checkedProducts, setCheckedProducts] =
     useState<Record<string, CheckedProduct>>({});
 
-  const [quantityProduct, setQuantityProduct] =
-    useState<WarehouseStock | null>(null);
-
-  const [physicalQuantity, setPhysicalQuantity] =
-    useState("");
-
   const [scanMessage, setScanMessage] =
     useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+
+  const scannedSerialsRef = useRef<Set<string>>(new Set());
 
   const barcodeInputRef =
     useRef<HTMLInputElement>(null);
-
-  /* =====================================================
-     LOAD WAREHOUSE STOCK
-  ===================================================== */
-
-  const loadStock = async () => {
-    try {
-      setError("");
-      const token = localStorage.getItem("accessToken");
-
-      if (!token) {
-        throw new Error("Login session not found. Please sign in again.");
-      }
-
-      const response = await fetch(
-       `${API_BASE_URL}/warehouse-stock?warehouseCode=SUNTREE-MAIN`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to load warehouse stock (${response.status})`,
-        );
-      }
-
-      const data =
-        (await response.json()) as WarehouseStock[];
-
-      setStocks(data);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load warehouse stock.",
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   const loadSerialInventory = async () => {
     try {
@@ -151,11 +65,11 @@ export default function StockCountPage() {
       );
     } finally {
       setSerialInventoryLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadStock();
     loadSerialInventory();
   }, []);
 
@@ -166,51 +80,41 @@ export default function StockCountPage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     setSerialInventoryLoading(true);
-    await Promise.all([loadStock(), loadSerialInventory()]);
+    await loadSerialInventory();
   };
 
   /* =====================================================
      FILTER STOCK
   ===================================================== */
 
-  const filteredStocks = useMemo(() => {
+  const filteredSerialInventory = useMemo(() => {
     const keyword = search
       .trim()
       .toLowerCase();
 
-    if (!keyword) {
-      return stocks;
-    }
-
-    return stocks.filter((stock) => {
+    return serialInventory.filter((product) => {
       return (
-        stock.product.productCode
+        !keyword ||
+        product.productCode
           .toLowerCase()
           .includes(keyword) ||
-        stock.product.productName
+        product.name
           .toLowerCase()
           .includes(keyword) ||
-        (stock.product.brand || "")
+        (product.modelCode || "")
           .toLowerCase()
           .includes(keyword) ||
-        (stock.product.model || "")
+        (product.category || "")
           .toLowerCase()
           .includes(keyword)
       );
-    });
-  }, [stocks, search]);
+    }).sort((a, b) => a.productCode.localeCompare(b.productCode, undefined, { numeric: true, sensitivity: "base" }));
+  }, [serialInventory, search]);
 
   /* =====================================================
      SUMMARY
   ===================================================== */
 
-  const totalProducts = stocks.length;
-
-  const totalQuantity = stocks.reduce(
-    (total, stock) =>
-      total + Number(stock.quantity || 0),
-    0,
-  );
   const totalSerialsInStock = serialInventory.reduce(
     (total, product) => total + product.serials.inStock,
     0,
@@ -233,232 +137,83 @@ export default function StockCountPage() {
      REMAINING PRODUCTS
   ===================================================== */
 
-  const remainingProducts = stocks
-    .map((stock) => {
-      const checked =
-        checkedProducts[stock.productId];
-
-      const checkedQty =
-        checked?.checkedQty || 0;
-
-      const remaining =
-        Math.max(
-          Number(stock.quantity || 0) -
-            checkedQty,
-          0,
-        );
-
-      return {
-        stock,
-        checkedQty,
-        remaining,
-      };
-    })
-    .filter(
-      (item) => item.remaining > 0,
-    );
-
-  /* =====================================================
-     FIND PRODUCT BY BARCODE
-  ===================================================== */
-
-  const findProductByBarcode = (
-    value: string,
-  ) => {
-    const normalized = value
-      .trim()
-      .toLowerCase();
-
-    if (!normalized) {
-      return null;
-    }
-
-    return (
-      stocks.find(
-        (stock) =>
-          stock.product.productCode
-            .trim()
-            .toLowerCase() ===
-          normalized,
-      ) || null
-    );
-  };
-
-  /* =====================================================
-     UNIT SCAN
-  ===================================================== */
+  const remainingProducts = serialInventory
+    .map((product) => ({
+      product,
+      checkedQty: checkedProducts[product.id]?.checkedQty ?? 0,
+      remaining: Math.max(product.serials.inStock - (checkedProducts[product.id]?.checkedQty ?? 0), 0),
+    }))
+    .filter((item) => item.remaining > 0);
 
   const handleUnitScan = (
-    stock: WarehouseStock,
+    serial: { id: string; serialNumber: string; status: string; productId: string; product?: { productCode: string; name: string } | null },
   ) => {
+    const product = serialInventory.find((item) => item.id === serial.productId);
+    if (!product) {
+      setScanMessage(`Product for serial ${serial.serialNumber} is not in the product list.`);
+      return;
+    }
+
+    if (serial.status !== "IN_STOCK") {
+      setScanMessage(`${serial.serialNumber} is ${serial.status.toLowerCase().replace(/_/g, " ")}, not in stock.`);
+      return;
+    }
+
+    const normalizedSerial = serial.serialNumber.replace(/\s/g, "").toUpperCase();
+    if (scannedSerialsRef.current.has(normalizedSerial)) {
+      setScanMessage(`${serial.serialNumber} was already scanned.`);
+      return;
+    }
+    scannedSerialsRef.current.add(normalizedSerial);
+
     setCheckedProducts((previous) => {
-      const existing =
-        previous[stock.productId];
-
-      const currentQty =
-        existing?.checkedQty || 0;
-
-      const nextQty = currentQty + 1;
+      const existing = previous[product.id];
+      const nextQty = (existing?.checkedQty || 0) + 1;
 
       return {
         ...previous,
-
-        [stock.productId]: {
-          productId:
-            stock.productId,
-
-          stockId:
-            stock.id,
-
-          productCode:
-            stock.product.productCode,
-
-          productName:
-            stock.product.productName,
-
-          trackingType:
-            stock.product.trackingType,
-
-          systemQty:
-            Number(stock.quantity || 0),
-
-          checkedQty:
-            nextQty,
+        [product.id]: {
+          productId: product.id,
+          productCode: product.productCode,
+          productName: product.name,
+          trackingType: "SERIAL",
+          systemQty: product.serials.inStock,
+          checkedQty: nextQty,
         },
       };
     });
 
-    setScanMessage(
-      `${stock.product.productCode} scanned successfully.`,
-    );
-  };
-
-  /* =====================================================
-     QUANTITY PRODUCT
-  ===================================================== */
-
-  const openQuantityCount = (
-    stock: WarehouseStock,
-  ) => {
-    setQuantityProduct(stock);
-
-    const existing =
-      checkedProducts[stock.productId];
-
-    setPhysicalQuantity(
-      existing
-        ? String(existing.checkedQty)
-        : "",
-    );
-  };
-
-  const confirmQuantityCount = () => {
-    if (!quantityProduct) {
-      return;
-    }
-
-    const qty =
-      Number(physicalQuantity);
-
-    if (
-      !Number.isFinite(qty) ||
-      qty < 0
-    ) {
-      setScanMessage(
-        "Please enter a valid physical quantity.",
-      );
-
-      return;
-    }
-
-    setCheckedProducts(
-      (previous) => ({
-        ...previous,
-
-        [quantityProduct.productId]: {
-          productId:
-            quantityProduct.productId,
-
-          stockId:
-            quantityProduct.id,
-
-          productCode:
-            quantityProduct.product.productCode,
-
-          productName:
-            quantityProduct.product.productName,
-
-          trackingType:
-            quantityProduct.product.trackingType,
-
-          systemQty:
-            Number(
-              quantityProduct.quantity || 0,
-            ),
-
-          checkedQty:
-            qty,
-
-          physicalQty:
-            qty,
-        },
-      }),
-    );
-
-    setScanMessage(
-      `${quantityProduct.product.productCode} count saved.`,
-    );
-
-    setQuantityProduct(null);
-    setPhysicalQuantity("");
-
-    setTimeout(() => {
-      barcodeInputRef.current?.focus();
-    }, 50);
+    setScanMessage(`${serial.serialNumber} counted for ${product.productCode}.`);
   };
 
   /* =====================================================
      BARCODE SCAN HANDLER
   ===================================================== */
 
-  const handleBarcodeScan = () => {
+  const handleBarcodeScan = async () => {
     const value = barcode.trim();
 
-    if (!value) {
-      return;
-    }
-
-    const stock =
-      findProductByBarcode(value);
-
-    if (!stock) {
-      setScanMessage(
-        `Barcode "${value}" was not found in warehouse stock.`,
-      );
-
-      setBarcode("");
-
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 50);
-
-      return;
-    }
-
-    if (
-      stock.product.trackingType ===
-      "QUANTITY"
-    ) {
-      openQuantityCount(stock);
-    } else {
-      handleUnitScan(stock);
-    }
-
+    if (!value || scanLoading) return;
     setBarcode("");
-
-    setTimeout(() => {
-      barcodeInputRef.current?.focus();
-    }, 50);
+    setScanLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Login session not found. Please sign in again.");
+      const response = await fetch(`${API_BASE_URL}/serials/scan/${encodeURIComponent(value)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || `Serial lookup failed (${response.status}).`);
+      }
+      handleUnitScan(await response.json());
+    } catch (err) {
+      setScanMessage(err instanceof Error ? err.message : "Unable to verify serial barcode.");
+    } finally {
+      setScanLoading(false);
+      setTimeout(() => barcodeInputRef.current?.focus(), 50);
+    }
   };
 
   /* =====================================================
@@ -490,6 +245,7 @@ export default function StockCountPage() {
     }
 
     setCheckedProducts({});
+    scannedSerialsRef.current.clear();
     setScanMessage("");
     setBarcode("");
 
@@ -561,7 +317,7 @@ export default function StockCountPage() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                Warehouse stock checking system.
+                Check physical serial stock against Serial Management.
               </p>
             </div>
 
@@ -593,44 +349,7 @@ export default function StockCountPage() {
             MODE BUTTONS
         ================================================= */}
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-
-          <button
-            type="button"
-            onClick={() =>
-              setShowStockList(
-                (value) => !value,
-              )
-            }
-            className={`flex min-h-[92px] items-center gap-4 rounded-2xl border p-5 text-left shadow-sm transition ${
-              showStockList
-                ? "border-emerald-500 bg-emerald-50"
-                : "border-slate-200 bg-white hover:border-emerald-300"
-            }`}
-          >
-
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
-              {showStockList ? (
-                <Eye size={25} />
-              ) : (
-                <EyeOff size={25} />
-              )}
-            </div>
-
-            <div className="flex-1">
-
-              <div className="text-lg font-bold text-slate-900">
-                Warehouse Stock List
-              </div>
-
-              <div className="mt-1 text-sm text-slate-500">
-                View or hide current warehouse stock.
-              </div>
-
-            </div>
-
-          </button>
-
+        <div className="mb-6 grid grid-cols-1 gap-4">
           <button
             type="button"
             onClick={() => {
@@ -669,27 +388,39 @@ export default function StockCountPage() {
 
         </div>
 
-        <details className="group mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Product Serial Stock</h2>
-              <p className="mt-1 text-xs text-slate-500">Remaining Suntree serial stock from Serial Management.</p>
+              <h2 className="text-lg font-bold text-slate-900">Product Serial Stock</h2>
+              <p className="mt-1 text-sm text-slate-500">Remaining Suntree serial stock, sorted by product code.</p>
             </div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
-              {serialInventoryLoading ? "—" : `${totalSerialsInStock} in stock`}
-            </span>
-          </summary>
-          <div className="border-t border-slate-200 p-4">
+            <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
+                {serialInventoryLoading ? "—" : `${totalSerialsInStock} in stock`}
+              </span>
+              <div className="relative min-w-[240px] flex-1 sm:flex-none">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search product code or name..."
+                  className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="p-4">
             {serialInventoryLoading ? (
               <div className="py-8 text-center text-sm text-slate-500">Loading serial stock...</div>
             ) : serialInventoryError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{serialInventoryError}</div>
-            ) : serialInventory.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-500">No serial products found.</div>
+            ) : filteredSerialInventory.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-500">No matching serial products found.</div>
             ) : (
-              <div className="max-h-96 overflow-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[640px] text-sm">
-                  <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
+                  <thead className="bg-slate-50 text-left text-slate-600">
                     <tr>
                       <th className="px-4 py-3">Product code</th>
                       <th className="px-4 py-3">Product</th>
@@ -698,7 +429,7 @@ export default function StockCountPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {serialInventory.map((product) => (
+                    {filteredSerialInventory.map((product) => (
                       <tr key={product.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-semibold">{product.productCode}</td>
                         <td className="px-4 py-3">{product.name}</td>
@@ -713,7 +444,7 @@ export default function StockCountPage() {
               </div>
             )}
           </div>
-        </details>
+        </section>
 
         {/* =================================================
             STOCK CHECK SYSTEM
@@ -739,7 +470,7 @@ export default function StockCountPage() {
                     </h2>
 
                     <p className="text-xs text-slate-500">
-                      UNIT = scan each barcode. QUANTITY = scan then enter physical quantity.
+                      Scan each serial barcode once. Only serials currently in stock are counted.
                     </p>
 
                   </div>
@@ -793,9 +524,10 @@ export default function StockCountPage() {
                 <button
                   type="button"
                   onClick={handleBarcodeScan}
-                  className="rounded-xl bg-blue-600 px-7 py-4 font-bold text-white shadow-sm hover:bg-blue-700"
+                  disabled={scanLoading || !barcode.trim()}
+                  className="rounded-xl bg-blue-600 px-7 py-4 font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Scan
+                  {scanLoading ? "Checking..." : "Scan"}
                 </button>
 
               </div>
@@ -881,7 +613,7 @@ export default function StockCountPage() {
                     </p>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      Start scanning a warehouse barcode.
+                      Start scanning an in-stock serial barcode.
                     </p>
 
                   </div>
@@ -1026,7 +758,7 @@ export default function StockCountPage() {
                   </h3>
 
                   <p className="text-xs text-slate-500">
-                    Products still remaining from the original warehouse stock list.
+                    In-stock serials not scanned yet.
                   </p>
 
                 </div>
@@ -1046,7 +778,7 @@ export default function StockCountPage() {
                       </p>
 
                       <p className="text-xs text-emerald-600">
-                        No remaining quantity from the current count.
+                        No remaining in-stock serials to check.
                       </p>
                     </div>
 
@@ -1092,9 +824,7 @@ export default function StockCountPage() {
                             index,
                           ) => (
                             <tr
-                              key={
-                                item.stock.id
-                              }
+                              key={item.product.id}
                               className="border-b border-slate-100 last:border-0"
                             >
 
@@ -1106,27 +836,20 @@ export default function StockCountPage() {
 
                                 <div className="font-semibold text-slate-900">
                                   {
-                                    item.stock
-                                      .product
-                                      .productCode
+                                    item.product.productCode
                                   }
                                 </div>
 
                                 <div className="mt-1 text-xs text-slate-500">
                                   {
-                                    item.stock
-                                      .product
-                                      .productName
+                                    item.product.name
                                   }
                                 </div>
 
                               </td>
 
                               <td className="px-4 py-4 text-center font-semibold text-slate-700">
-                                {
-                                  item.stock
-                                    .quantity
-                                }
+                                {item.product.serials.inStock}
                               </td>
 
                               <td className="px-4 py-4 text-center font-semibold text-blue-600">
@@ -1157,333 +880,6 @@ export default function StockCountPage() {
             </div>
 
           </section>
-        )}
-
-        {/* =================================================
-            WAREHOUSE STOCK LIST
-        ================================================= */}
-
-        {showStockList && (
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-            <div className="border-b border-slate-200 p-5">
-
-              <div className="flex flex-wrap items-center justify-between gap-4">
-
-                <div>
-
-                  <h2 className="text-base font-bold text-slate-900">
-                    Warehouse Stock List
-                  </h2>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Current stock available in the warehouse.
-                  </p>
-
-                </div>
-
-                <div className="relative w-full sm:w-80">
-
-                  <Search
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) =>
-                      setSearch(
-                        event.target.value,
-                      )
-                    }
-                    placeholder="Search product..."
-                    className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-            {error && (
-              <div className="m-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            {loading ? (
-              <div className="px-5 py-16 text-center text-sm text-slate-500">
-                Loading warehouse stock...
-              </div>
-            ) : error ? null : filteredStocks.length ===
-              0 ? (
-              <div className="px-5 py-16 text-center">
-
-                <Package
-                  size={32}
-                  className="mx-auto text-slate-300"
-                />
-
-                <p className="mt-3 text-sm font-medium text-slate-600">
-                  No stock found.
-                </p>
-
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-
-                <table className="w-full min-w-[1000px] text-sm">
-
-                  <thead className="bg-slate-50">
-
-                    <tr className="border-b border-slate-200 text-left">
-
-                      <th className="px-5 py-3 text-center font-semibold text-slate-700">
-                        No.
-                      </th>
-
-                      <th className="px-5 py-3 font-semibold text-slate-700">
-                        Product
-                      </th>
-
-                      <th className="px-5 py-3 font-semibold text-slate-700">
-                        Product Name
-                      </th>
-
-                      <th className="px-5 py-3 font-semibold text-slate-700">
-                        Category
-                      </th>
-
-                      <th className="px-5 py-3 font-semibold text-slate-700">
-                        Tracking
-                      </th>
-
-                      <th className="px-5 py-3 text-center font-semibold text-slate-700">
-                        System Qty
-                      </th>
-
-                    </tr>
-
-                  </thead>
-
-                  <tbody>
-
-                    {filteredStocks.map(
-                      (stock, index) => (
-                        <tr
-                          key={stock.id}
-                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                        >
-
-                          <td className="px-5 py-4 text-center font-semibold text-slate-500">
-                            {index + 1}
-                          </td>
-
-                          <td className="px-5 py-4">
-
-                            <div className="font-semibold text-slate-900">
-                              {
-                                stock.product
-                                  .productCode
-                              }
-                            </div>
-
-                            <div className="mt-1 text-xs text-slate-400">
-                              {
-                                stock.product
-                                  .brand
-                              }{" "}
-                              {
-                                stock.product
-                                  .model
-                              }
-                            </div>
-
-                          </td>
-
-                          <td className="px-5 py-4 text-slate-700">
-                            {
-                              stock.product
-                                .productName
-                            }
-                          </td>
-
-                          <td className="px-5 py-4 text-slate-600">
-                            {
-                              stock.product
-                                .category ||
-                              "-"
-                            }
-                          </td>
-
-                          <td className="px-5 py-4">
-
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                              {
-                                stock.product
-                                  .trackingType
-                              }
-                            </span>
-
-                          </td>
-
-                          <td className="px-5 py-4 text-center">
-
-                            <span className="font-bold text-slate-900">
-                              {
-                                stock.quantity
-                              }
-                            </span>
-
-                            <span className="ml-1 text-xs text-slate-400">
-                              {
-                                stock.product
-                                  .unit
-                              }
-                            </span>
-
-                          </td>
-
-                        </tr>
-                      ),
-                    )}
-
-                  </tbody>
-
-                </table>
-
-              </div>
-            )}
-
-          </section>
-        )}
-
-        {/* =================================================
-            QUANTITY MODAL
-        ================================================= */}
-
-        {quantityProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-
-              <div className="flex items-center justify-between border-b border-slate-200 p-5">
-
-                <div>
-
-                  <h3 className="font-bold text-slate-900">
-                    Physical Quantity
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {
-                      quantityProduct.product
-                        .productCode
-                    }
-                  </p>
-
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setQuantityProduct(
-                      null,
-                    )
-                  }
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <X size={20} />
-                </button>
-
-              </div>
-
-              <div className="p-5">
-
-                <div className="rounded-xl bg-slate-50 p-4">
-
-                  <div className="text-sm font-semibold text-slate-900">
-                    {
-                      quantityProduct.product
-                        .productName
-                    }
-                  </div>
-
-                  <div className="mt-2 text-sm text-slate-500">
-                    System Quantity:
-                    <span className="ml-2 font-bold text-slate-900">
-                      {
-                        quantityProduct.quantity
-                      }
-                    </span>
-                  </div>
-
-                </div>
-
-                <label className="mt-5 block text-sm font-semibold text-slate-700">
-                  Current Physical Quantity
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={physicalQuantity}
-                  onChange={(event) =>
-                    setPhysicalQuantity(
-                      event.target.value,
-                    )
-                  }
-                  onKeyDown={(event) => {
-                    if (
-                      event.key ===
-                      "Enter"
-                    ) {
-                      event.preventDefault();
-                      confirmQuantityCount();
-                    }
-                  }}
-                  autoFocus
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-4 text-lg font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  placeholder="Enter quantity"
-                />
-
-                <div className="mt-5 flex gap-3">
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuantityProduct(
-                        null,
-                      );
-
-                      setPhysicalQuantity(
-                        "",
-                      );
-                    }}
-                    className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={
-                      confirmQuantityCount
-                    }
-                    className="flex-1 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
-                  >
-                    Confirm Count
-                  </button>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
         )}
 
       </div>
