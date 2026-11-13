@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardShell from "@/components/layout/DashboardShell";
+import { getDashboardSummary, type DashboardSummary } from "@/lib/api";
 
 import {
   Barcode,
@@ -59,6 +60,9 @@ type CheckedProduct = {
 
 export default function StockCountPage() {
   const [stocks, setStocks] = useState<WarehouseStock[]>([]);
+  const [serialInventory, setSerialInventory] = useState<DashboardSummary["products"]["inventory"]>([]);
+  const [serialInventoryLoading, setSerialInventoryLoading] = useState(true);
+  const [serialInventoryError, setSerialInventoryError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,11 +101,17 @@ export default function StockCountPage() {
   const loadStock = async () => {
     try {
       setError("");
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Login session not found. Please sign in again.");
+      }
 
       const response = await fetch(
        `${API_BASE_URL}/warehouse-stock?warehouseCode=SUNTREE-MAIN`,
         {
           method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         },
       );
@@ -130,8 +140,23 @@ export default function StockCountPage() {
     }
   };
 
+  const loadSerialInventory = async () => {
+    try {
+      setSerialInventoryError("");
+      const summary = await getDashboardSummary();
+      setSerialInventory(summary.products.inventory);
+    } catch (err) {
+      setSerialInventoryError(
+        err instanceof Error ? err.message : "Unable to load serial stock.",
+      );
+    } finally {
+      setSerialInventoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadStock();
+    loadSerialInventory();
   }, []);
 
   /* =====================================================
@@ -140,7 +165,8 @@ export default function StockCountPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadStock();
+    setSerialInventoryLoading(true);
+    await Promise.all([loadStock(), loadSerialInventory()]);
   };
 
   /* =====================================================
@@ -183,6 +209,10 @@ export default function StockCountPage() {
   const totalQuantity = stocks.reduce(
     (total, stock) =>
       total + Number(stock.quantity || 0),
+    0,
+  );
+  const totalSerialsInStock = serialInventory.reduce(
+    (total, product) => total + product.serials.inStock,
     0,
   );
 
@@ -638,6 +668,52 @@ export default function StockCountPage() {
           </button>
 
         </div>
+
+        <details className="group mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Product Serial Stock</h2>
+              <p className="mt-1 text-xs text-slate-500">Remaining Suntree serial stock from Serial Management.</p>
+            </div>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
+              {serialInventoryLoading ? "—" : `${totalSerialsInStock} in stock`}
+            </span>
+          </summary>
+          <div className="border-t border-slate-200 p-4">
+            {serialInventoryLoading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Loading serial stock...</div>
+            ) : serialInventoryError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{serialInventoryError}</div>
+            ) : serialInventory.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-500">No serial products found.</div>
+            ) : (
+              <div className="max-h-96 overflow-auto rounded-xl border border-slate-200">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">Product code</th>
+                      <th className="px-4 py-3">Product</th>
+                      <th className="px-4 py-3">Rating</th>
+                      <th className="px-4 py-3 text-right">Remaining stock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {serialInventory.map((product) => (
+                      <tr key={product.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold">{product.productCode}</td>
+                        <td className="px-4 py-3">{product.name}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {[product.poles == null ? null : `${product.poles}P`, product.ratedCurrent, product.ratedVoltage].filter(Boolean).join(" · ") || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-emerald-700">{product.serials.inStock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </details>
 
         {/* =================================================
             STOCK CHECK SYSTEM
@@ -1141,7 +1217,7 @@ export default function StockCountPage() {
               <div className="px-5 py-16 text-center text-sm text-slate-500">
                 Loading warehouse stock...
               </div>
-            ) : filteredStocks.length ===
+            ) : error ? null : filteredStocks.length ===
               0 ? (
               <div className="px-5 py-16 text-center">
 
