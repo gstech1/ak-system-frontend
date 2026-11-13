@@ -41,6 +41,8 @@ export default function StockCountPage() {
     useState(false);
 
   const [barcode, setBarcode] = useState("");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
 
   const [checkedProducts, setCheckedProducts] =
     useState<Record<string, CheckedProduct>>({});
@@ -147,22 +149,22 @@ export default function StockCountPage() {
 
   const handleUnitScan = (
     serial: { id: string; serialNumber: string; status: string; productId: string; product?: { productCode: string; name: string } | null },
-  ) => {
+  ): "counted" | "duplicate" | "not-in-stock" | "product-missing" => {
     const product = serialInventory.find((item) => item.id === serial.productId);
     if (!product) {
       setScanMessage(`Product for serial ${serial.serialNumber} is not in the product list.`);
-      return;
+      return "product-missing";
     }
 
     if (serial.status !== "IN_STOCK") {
       setScanMessage(`${serial.serialNumber} is ${serial.status.toLowerCase().replace(/_/g, " ")}, not in stock.`);
-      return;
+      return "not-in-stock";
     }
 
     const normalizedSerial = serial.serialNumber.replace(/\s/g, "").toUpperCase();
     if (scannedSerialsRef.current.has(normalizedSerial)) {
       setScanMessage(`${serial.serialNumber} was already scanned.`);
-      return;
+      return "duplicate";
     }
     scannedSerialsRef.current.add(normalizedSerial);
 
@@ -184,6 +186,7 @@ export default function StockCountPage() {
     });
 
     setScanMessage(`${serial.serialNumber} counted for ${product.productCode}.`);
+    return "counted";
   };
 
   /* =====================================================
@@ -210,6 +213,74 @@ export default function StockCountPage() {
       handleUnitScan(await response.json());
     } catch (err) {
       setScanMessage(err instanceof Error ? err.message : "Unable to verify serial barcode.");
+    } finally {
+      setScanLoading(false);
+      setTimeout(() => barcodeInputRef.current?.focus(), 50);
+    }
+  };
+
+  const handleSerialRangeScan = async () => {
+    const startSerial = rangeStart.trim().replace(/\s+/g, "");
+    const endSerial = rangeEnd.trim().replace(/\s+/g, "");
+    if (!startSerial || !endSerial || scanLoading) return;
+    if (startSerial > endSerial) {
+      setScanMessage("Start serial must be less than or equal to end serial.");
+      return;
+    }
+
+    setScanLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Login session not found. Please sign in again.");
+      const fetchPage = async (page: number) => {
+        const params = new URLSearchParams({
+          startSerial,
+          endSerial,
+          status: "IN_STOCK",
+          page: String(page),
+          limit: "100",
+        });
+        const response = await fetch(`${API_BASE_URL}/serials?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.message || `Serial range lookup failed (${response.status}).`);
+        }
+        return response.json() as Promise<{
+          data: Array<{ id: string; serialNumber: string; status: string; productId: string; product?: { productCode: string; name: string } | null }>;
+          total: number;
+          totalPages: number;
+        }>;
+      };
+
+      const firstPage = await fetchPage(1);
+      if (firstPage.total > 1000) {
+        throw new Error("This range contains more than 1,000 in-stock serials. Split it into smaller ranges.");
+      }
+      const otherPages = await Promise.all(
+        Array.from({ length: Math.max(firstPage.totalPages - 1, 0) }, (_, index) => fetchPage(index + 2)),
+      );
+      const serials = [...firstPage.data, ...otherPages.flatMap((page) => page.data)];
+      let added = 0;
+      let alreadyCounted = 0;
+      let missingProducts = 0;
+      for (const serial of serials) {
+        const result = handleUnitScan(serial);
+        if (result === "counted") added += 1;
+        else if (result === "duplicate") alreadyCounted += 1;
+        else if (result === "product-missing") missingProducts += 1;
+      }
+      setRangeStart("");
+      setRangeEnd("");
+      setScanMessage(
+        serials.length === 0
+          ? "No in-stock serials were found in that range."
+          : `Range checked: ${added} added, ${alreadyCounted} already counted${missingProducts ? `, ${missingProducts} product(s) unmatched` : ""}.`,
+      );
+    } catch (err) {
+      setScanMessage(err instanceof Error ? err.message : "Unable to check the serial range.");
     } finally {
       setScanLoading(false);
       setTimeout(() => barcodeInputRef.current?.focus(), 50);
@@ -514,6 +585,7 @@ export default function StockCountPage() {
                     onKeyDown={
                       handleBarcodeKeyDown
                     }
+                    disabled={scanLoading}
                     autoComplete="off"
                     placeholder="Scan barcode / QR code..."
                     className="w-full rounded-xl border border-slate-200 py-4 pl-12 pr-4 text-base font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -530,6 +602,45 @@ export default function StockCountPage() {
                   {scanLoading ? "Checking..." : "Scan"}
                 </button>
 
+              </div>
+
+              <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                <div className="mb-3">
+                  <h3 className="font-bold text-slate-900">Scan a serial range</h3>
+                  <p className="mt-1 text-xs text-slate-500">Enter the first and last serial number. Up to 1,000 in-stock serials can be checked per range.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Start serial
+                    <input
+                      type="text"
+                      value={rangeStart}
+                      onChange={(event) => setRangeStart(event.target.value)}
+                      disabled={scanLoading}
+                      placeholder="First serial number"
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    End serial
+                    <input
+                      type="text"
+                      value={rangeEnd}
+                      onChange={(event) => setRangeEnd(event.target.value)}
+                      disabled={scanLoading}
+                      placeholder="Last serial number"
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSerialRangeScan}
+                    disabled={scanLoading || !rangeStart.trim() || !rangeEnd.trim()}
+                    className="self-end rounded-xl bg-blue-600 px-6 py-3 font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {scanLoading ? "Checking..." : "Check Range"}
+                  </button>
+                </div>
               </div>
 
               {scanMessage && (
