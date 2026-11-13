@@ -548,13 +548,15 @@ export default function StockCountPage() {
 
                 </div>
 
-                <button
-                  type="button"
-                  onClick={clearCheckData}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Clear Check
-                </button>
+                {checkedQuantity > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearCheckData}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Clear Check
+                  </button>
+                )}
 
               </div>
 
@@ -648,6 +650,13 @@ export default function StockCountPage() {
                   {scanMessage}
                 </div>
               )}
+
+              {checkedQuantity === 0 ? (
+                <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
+                  Stock count has not started. Scan a barcode or check a serial range to begin.
+                </div>
+              ) : (
+                <>
 
               {/* CHECK SUMMARY */}
 
@@ -987,6 +996,9 @@ export default function StockCountPage() {
                 )}
 
               </div>
+
+                </>
+              )}
 
             </div>
 
