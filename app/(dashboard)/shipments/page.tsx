@@ -4,6 +4,7 @@ import {
   FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
@@ -129,6 +130,7 @@ export default function ShipmentsPage() {
 
   const [serialNumbers, setSerialNumbers] =
     useState<string[]>([]);
+  const scannedSerialsRef = useRef(new Set<string>());
 
   const warrantyReminderShipments = useMemo(() => {
     const groups = new Map<string, { shipmentId: string; shipmentNo: string; dealerCode: string; dealerName: string; shipmentDate: string; reminderDays: number; warrantyEnd: string; serials: WarrantyExtensionReminder[] }>();
@@ -288,6 +290,7 @@ export default function ShipmentsPage() {
     setRemarks("");
     setWarrantyReminderDays(30);
     setScanSerial("");
+    scannedSerialsRef.current.clear();
     setSerialNumbers([]);
   }
 
@@ -411,7 +414,7 @@ export default function ShipmentsPage() {
     }
   }
 
-  async function addScannedSerial() {
+  function addScannedSerial() {
     const serialNumber = scanSerial.replace(/\D/g, "");
 
     if (!serialNumber) return;
@@ -421,46 +424,16 @@ export default function ShipmentsPage() {
       return;
     }
 
-    if (serialNumbers.includes(serialNumber)) {
+    if (scannedSerialsRef.current.has(serialNumber)) {
       setError(`Serial ${serialNumber} is already in this shipment.`);
       setScanSerial("");
       return;
     }
 
-    try {
-      const serial = await getSerialByNumber(serialNumber);
-
-      if (serial.status !== "IN_STOCK") {
-        setError(
-          `Serial ${serialNumber} cannot be added because its status is ${serial.status}. Only warehouse IN_STOCK serials can be shipped.`,
-        );
-        setScanSerial("");
-        return;
-      }
-
-      if (!serial.productId && !serial.product?.id) {
-        setError(
-          `Serial ${serialNumber} is not assigned to a product and cannot be shipped.`,
-        );
-        setScanSerial("");
-        return;
-      }
-
-      setSerialNumbers((current) =>
-        current.includes(serialNumber)
-          ? current
-          : [...current, serialNumber],
-      );
-      setScanSerial("");
-      setError("");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? `Serial ${serialNumber} was not added: ${err.message}`
-          : `Serial ${serialNumber} was not found in Serial Management.`,
-      );
-      setScanSerial("");
-    }
+    scannedSerialsRef.current.add(serialNumber);
+    setSerialNumbers((current) => [...current, serialNumber]);
+    setScanSerial("");
+    setError("");
   }
 
   async function handleCreate(
@@ -949,9 +922,12 @@ export default function ShipmentsPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              setSerialNumbers((current) =>
-                                current.filter((value) => value !== serialNumber),
-                              )
+                              (() => {
+                                scannedSerialsRef.current.delete(serialNumber);
+                                setSerialNumbers((current) =>
+                                  current.filter((value) => value !== serialNumber),
+                                );
+                              })()
                             }
                             aria-label={`Remove serial ${serialNumber}`}
                             className="font-sans font-bold text-red-600 hover:text-red-800"

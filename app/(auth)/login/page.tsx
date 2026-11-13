@@ -22,7 +22,7 @@ export default function LoginPage() {
     if (sessionStorage.getItem("swmsSessionEndedByIdle") === "1") {
       sessionStorage.removeItem("swmsSessionEndedByIdle");
       const timer = window.setTimeout(() => {
-        setSessionMessage("အသုံးမပြုဘဲ ၁ နာရီပြည့်သွားသောကြောင့် ထွက်လိုက်ပါပြီ။ ဆက်သုံးရန် ပြန်ဝင်ပါ။");
+        setSessionMessage("အသုံးမပြုဘဲ ၄ နာရီပြည့်သွားသောကြောင့် ထွက်လိုက်ပါပြီ။ ဆက်သုံးရန် ပြန်ဝင်ပါ။");
       }, 0);
       return () => window.clearTimeout(timer);
     }
