@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
+const IDLE_TIMEOUT_MS = 4 * 60 * 60 * 1000;
 const ACTIVITY_STORAGE_KEY = "swmsLastActivityAt";
 const AUTH_KEYS = ["accessToken", "authUser"];
 
