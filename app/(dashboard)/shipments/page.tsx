@@ -36,6 +36,8 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5001"
 ).replace(/\/+$/, "");
+const MAX_SHIPMENT_SERIALS = 1000;
+const MAX_SERIALS_PER_RANGE = 100;
 
 type Dealer = {
   id: string;
@@ -127,6 +129,8 @@ export default function ShipmentsPage() {
 
   const [scanSerial, setScanSerial] =
     useState("");
+  const [rangeStartSerial, setRangeStartSerial] = useState("");
+  const [rangeEndSerial, setRangeEndSerial] = useState("");
 
   const [serialNumbers, setSerialNumbers] =
     useState<string[]>([]);
@@ -290,6 +294,8 @@ export default function ShipmentsPage() {
     setRemarks("");
     setWarrantyReminderDays(30);
     setScanSerial("");
+    setRangeStartSerial("");
+    setRangeEndSerial("");
     scannedSerialsRef.current.clear();
     setSerialNumbers([]);
   }
@@ -430,10 +436,64 @@ export default function ShipmentsPage() {
       return;
     }
 
+    if (scannedSerialsRef.current.size >= MAX_SHIPMENT_SERIALS) {
+      setError("A shipment can contain up to 1,000 serials.");
+      setScanSerial("");
+      return;
+    }
+
     scannedSerialsRef.current.add(serialNumber);
     setSerialNumbers((current) => [...current, serialNumber]);
     setScanSerial("");
     setError("");
+  }
+
+  function addSerialRange() {
+    const start = rangeStartSerial.replace(/\D/g, "");
+    const end = rangeEndSerial.replace(/\D/g, "");
+
+    if (start.length !== 9 || end.length !== 9) {
+      setError("Serial range must contain exactly 9 digits at both ends.");
+      return;
+    }
+
+    const startNumber = Number(start);
+    const endNumber = Number(end);
+    if (endNumber < startNumber) {
+      setError("End Serial must be greater than or equal to Start Serial.");
+      return;
+    }
+
+    const rangeSize = endNumber - startNumber + 1;
+    if (rangeSize > MAX_SERIALS_PER_RANGE) {
+      setError("Each range can add up to 100 serials. Split larger ranges into multiple ranges.");
+      return;
+    }
+
+    const newSerials: string[] = [];
+    for (let value = startNumber; value <= endNumber; value += 1) {
+      const serialNumber = String(value).padStart(9, "0");
+      if (!scannedSerialsRef.current.has(serialNumber)) {
+        newSerials.push(serialNumber);
+      }
+    }
+
+    if (newSerials.length === 0) {
+      setError("All serials in this range are already in the shipment.");
+      return;
+    }
+
+    if (scannedSerialsRef.current.size + newSerials.length > MAX_SHIPMENT_SERIALS) {
+      setError("A shipment can contain up to 1,000 serials.");
+      return;
+    }
+
+    newSerials.forEach((serialNumber) => scannedSerialsRef.current.add(serialNumber));
+    setSerialNumbers((current) => [...current, ...newSerials]);
+    setRangeStartSerial("");
+    setRangeEndSerial("");
+    setError("");
+    setSuccess("Serial range added. Check the count before shipment.");
   }
 
   async function handleCreate(
@@ -906,6 +966,42 @@ export default function ShipmentsPage() {
                 <p className="mt-1 text-xs text-slate-500">
                   A barcode scanner that types into the field and sends Enter will add each serial automatically.
                 </p>
+
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-3 text-sm font-semibold text-slate-700">Add a Serial Range</p>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Start Serial
+                      <input
+                        value={rangeStartSerial.length === 9 ? `${rangeStartSerial.slice(0, 3)} ${rangeStartSerial.slice(3, 6)} ${rangeStartSerial.slice(6)}` : rangeStartSerial}
+                        onChange={(event) => setRangeStartSerial(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                        placeholder="000 000 001"
+                        inputMode="numeric"
+                        maxLength={11}
+                        className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-mono text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700">
+                      End Serial
+                      <input
+                        value={rangeEndSerial.length === 9 ? `${rangeEndSerial.slice(0, 3)} ${rangeEndSerial.slice(3, 6)} ${rangeEndSerial.slice(6)}` : rangeEndSerial}
+                        onChange={(event) => setRangeEndSerial(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                        placeholder="000 000 100"
+                        inputMode="numeric"
+                        maxLength={11}
+                        className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-mono text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addSerialRange}
+                      className="h-11 rounded-xl border border-emerald-300 bg-white px-4 font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                    >
+                      Add Range
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Add up to 100 consecutive serials per range. Add more ranges to the same shipment; maximum 1,000 serials per shipment.</p>
+                </div>
 
                 {serialNumbers.length > 0 && (
                   <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
