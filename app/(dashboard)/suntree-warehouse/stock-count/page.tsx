@@ -37,8 +37,8 @@ export default function StockCountPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
 
-  const [stockCheckOpen, setStockCheckOpen] =
-    useState(false);
+  const [activeView, setActiveView] =
+    useState<"inventory" | "check">("inventory");
 
   const [barcode, setBarcode] = useState("");
   const [rangeStart, setRangeStart] = useState("");
@@ -420,46 +420,61 @@ export default function StockCountPage() {
             MODE BUTTONS
         ================================================= */}
 
-        <div className="mb-6 grid grid-cols-1 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <button
             type="button"
             onClick={() => {
-              setStockCheckOpen(
-                (value) => !value,
-              );
-
-              setTimeout(() => {
-                barcodeInputRef.current?.focus();
-              }, 100);
+              setActiveView("inventory");
             }}
-            className={`flex min-h-[92px] items-center gap-4 rounded-2xl border p-5 text-left shadow-sm transition ${
-              stockCheckOpen
-                ? "border-blue-500 bg-blue-50"
-                : "border-slate-200 bg-white hover:border-blue-300"
+            className={`flex min-h-[76px] items-center gap-4 rounded-2xl border p-4 text-left shadow-sm transition ${
+              activeView === "inventory"
+                ? "border-emerald-500 bg-emerald-50"
+                : "border-slate-200 bg-white hover:border-emerald-300"
             }`}
           >
 
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <ScanLine size={25} />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Barcode size={23} />
             </div>
 
             <div className="flex-1">
 
               <div className="text-lg font-bold text-slate-900">
-                Stock Check System
+                Product Serial Stock
               </div>
 
               <div className="mt-1 text-sm text-slate-500">
-                Scan barcode / QR and check physical stock.
+                View remaining serial quantities by product.
               </div>
 
             </div>
 
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setActiveView("check");
+              setTimeout(() => barcodeInputRef.current?.focus(), 100);
+            }}
+            className={`flex min-h-[76px] items-center gap-4 rounded-2xl border p-4 text-left shadow-sm transition ${
+              activeView === "check"
+                ? "border-blue-500 bg-blue-50"
+                : "border-slate-200 bg-white hover:border-blue-300"
+            }`}
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+              <ScanLine size={23} />
+            </div>
+            <div className="flex-1">
+              <div className="text-lg font-bold text-slate-900">Stock Check System</div>
+              <div className="mt-1 text-sm text-slate-500">Scan barcode / QR to count physical stock.</div>
+            </div>
+          </button>
+
         </div>
 
-        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {activeView === "inventory" && <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Product Serial Stock</h2>
@@ -515,13 +530,13 @@ export default function StockCountPage() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
 
         {/* =================================================
             STOCK CHECK SYSTEM
         ================================================= */}
 
-        {stockCheckOpen && (
+        {activeView === "check" && (
           <section className="mb-6 rounded-2xl border border-blue-200 bg-white shadow-sm">
 
             <div className="border-b border-blue-100 bg-blue-50/60 p-5">
