@@ -101,6 +101,7 @@ export default function DealerDashboardPage() {
   const [filter, setFilter] = useState<"ALL" | "STOCK" | "WARRANTY">("ALL");
   const [selectedExtensionSerials, setSelectedExtensionSerials] = useState<Record<string, string[]>>({});
   const [extensionNote, setExtensionNote] = useState("");
+  const [confirmedUnsold, setConfirmedUnsold] = useState(false);
   const [extensionBusy, setExtensionBusy] = useState(false);
   const [extensionMessage, setExtensionMessage] = useState("");
 
@@ -160,20 +161,21 @@ export default function DealerDashboardPage() {
 
   async function submitExtensionRequest(shipmentId: string) {
     const serialNumbers = selectedExtensionSerials[shipmentId] ?? [];
-    if (!auth?.accessToken || serialNumbers.length === 0) return;
+    if (!auth?.accessToken || serialNumbers.length === 0 || !confirmedUnsold) return;
     setExtensionBusy(true);
     setExtensionMessage("");
     try {
       const response = await fetch(`${API_BASE_URL}/warranty/dealer/extension-requests`, {
         method: "POST",
         headers: { Authorization: `Bearer ${auth.accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ serialNumbers, dealerNote: extensionNote }),
+        body: JSON.stringify({ serialNumbers, dealerNote: extensionNote, confirmedUnsold }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(Array.isArray(data?.message) ? data.message.join(" ") : data?.message || "တောင်းဆိုမှု မပို့နိုင်ပါ။");
       setExtensionMessage(`${data.count} serial ပါသော Shipment သက်တမ်းတိုးတောင်းဆိုမှုကို ပို့ပြီးပါပြီ။ ဝန်ထမ်းစစ်ဆေးမှုကို စောင့်ပါ။`);
       setSelectedExtensionSerials((current) => ({ ...current, [shipmentId]: [] }));
       setExtensionNote("");
+      setConfirmedUnsold(false);
       await loadOverview(auth.accessToken);
     } catch (err) {
       setExtensionMessage(err instanceof Error ? err.message : "တောင်းဆိုမှု မပို့နိုင်ပါ။");
@@ -313,6 +315,10 @@ export default function DealerDashboardPage() {
                   <div className="mt-3">
                     <input value={extensionNote} onChange={(event) => setExtensionNote(event.target.value)} placeholder="မှတ်ချက် (မဖြစ်မနေမဟုတ်ပါ)" className="h-10 w-full rounded-lg border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400" />
                   </div>
+                  <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-white p-3 text-xs leading-5 text-amber-950">
+                    <input type="checkbox" checked={confirmedUnsold} onChange={(event) => setConfirmedUnsold(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600" />
+                    <span>ရွေးထားသော serial များသည် ဆိုင်တွင် လက်ကျန်ရှိပြီး Customer ထံ မရောင်းရသေးကြောင်း အတည်ပြုပါသည်။</span>
+                  </label>
                   <div className="mt-3 space-y-3">
                     {extensionGroups.map((group) => {
                       const selected = selectedExtensionSerials[group.shipmentId] ?? [];
@@ -325,7 +331,7 @@ export default function DealerDashboardPage() {
                         <div className="mt-2 grid gap-1 sm:grid-cols-2">
                           {group.units.map((unit) => <label key={unit.serialNumber} className="flex min-w-0 items-center gap-2 rounded-lg bg-amber-50/60 px-2.5 py-2 text-xs text-slate-700"><input type="checkbox" checked={selected.includes(unit.serialNumber)} onChange={(event) => setSelectedExtensionSerials((current) => { const values = current[group.shipmentId] ?? []; return { ...current, [group.shipmentId]: event.target.checked ? [...values, unit.serialNumber] : values.filter((value) => value !== unit.serialNumber) }; })} className="h-4 w-4 shrink-0 accent-amber-600" /><span className="truncate">{unit.productName || unit.productCode} · <span className="font-mono font-bold">{formatSerial(unit.serialNumber)}</span></span></label>)}
                         </div>
-                        <div className="mt-3 flex justify-end"><button type="button" onClick={() => void submitExtensionRequest(group.shipmentId)} disabled={extensionBusy || selected.length === 0} className="h-10 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white disabled:opacity-50">{extensionBusy ? "ပို့နေသည်…" : `ရွေးထားသော ${selected.length} လုံး တောင်းရန်`}</button></div>
+                        <div className="mt-3 flex justify-end"><button type="button" onClick={() => void submitExtensionRequest(group.shipmentId)} disabled={extensionBusy || selected.length === 0 || !confirmedUnsold} className="h-10 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white disabled:opacity-50">{extensionBusy ? "ပို့နေသည်…" : `ရွေးထားသော ${selected.length} လုံး တောင်းရန်`}</button></div>
                       </section>;
                     })}
                   </div>
