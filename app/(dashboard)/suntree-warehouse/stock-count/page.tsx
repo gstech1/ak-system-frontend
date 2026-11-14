@@ -426,15 +426,15 @@ export default function StockCountPage() {
             onClick={() => {
               setActiveView("inventory");
             }}
-            className={`flex min-h-[76px] items-center gap-4 rounded-2xl border p-4 text-left shadow-sm transition ${
+            className={`flex min-h-[68px] items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition ${
               activeView === "inventory"
                 ? "border-emerald-500 bg-emerald-50"
                 : "border-slate-200 bg-white hover:border-emerald-300"
             }`}
           >
 
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
-              <Barcode size={23} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Barcode size={20} />
             </div>
 
             <div className="flex-1">
@@ -457,14 +457,14 @@ export default function StockCountPage() {
               setActiveView("check");
               setTimeout(() => barcodeInputRef.current?.focus(), 100);
             }}
-            className={`flex min-h-[76px] items-center gap-4 rounded-2xl border p-4 text-left shadow-sm transition ${
+            className={`flex min-h-[68px] items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition ${
               activeView === "check"
                 ? "border-blue-500 bg-blue-50"
                 : "border-slate-200 bg-white hover:border-blue-300"
             }`}
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <ScanLine size={23} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+              <ScanLine size={20} />
             </div>
             <div className="flex-1">
               <div className="text-lg font-bold text-slate-900">Stock Check System</div>
