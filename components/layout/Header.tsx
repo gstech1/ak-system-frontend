@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useDashboardLanguage } from "@/components/layout/DashboardLanguageProvider";
@@ -73,7 +73,7 @@ export default function Header({ authUser, authLoaded }: HeaderProps = {}) {
     <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-8">
       <div>
         <h1
-          className={`text-3xl font-bold tracking-tight ${
+          className={`whitespace-nowrap text-3xl font-bold tracking-tight ${
             isMTKSolar
               ? "text-blue-700"
               : "text-emerald-700"
@@ -112,19 +112,6 @@ export default function Header({ authUser, authLoaded }: HeaderProps = {}) {
             >
               မြန်မာ
             </button>
-        </div>
-
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Search..."
-            className="h-10 w-72 rounded-xl border border-slate-200 pl-10 pr-4 outline-none transition focus:border-emerald-500"
-          />
         </div>
 
         <button
