@@ -13,6 +13,7 @@ import {
   approveSerialReject,
   createSerialBulk,
   deleteSerial,
+  getDashboardSummary,
   getProducts,
   getSerials,
   getWarrantyPolicies,
@@ -161,6 +162,7 @@ export default function SerialsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [serialCounts, setSerialCounts] = useState<{ total: number; inStock: number; shipped: number } | null>(null);
 
   const [search, setSearch] = useState("");
   const [rangeStart, setRangeStart] = useState("");
@@ -222,6 +224,7 @@ export default function SerialsPage() {
 
       const [
         serialsData,
+        dashboardSummary,
         productsData,
         warrantyPoliciesData,
       ] = await Promise.all([
@@ -234,6 +237,7 @@ export default function SerialsPage() {
           rangeStart,
           rangeEnd,
         ),
+        getDashboardSummary().catch(() => null),
         getProducts(),
         getWarrantyPolicies(),
       ]);
@@ -243,6 +247,11 @@ export default function SerialsPage() {
       setTotalPages(
         serialsData.totalPages,
       );
+      setSerialCounts(dashboardSummary ? {
+        total: dashboardSummary.serials.total,
+        inStock: dashboardSummary.serials.inStock,
+        shipped: dashboardSummary.serials.shipped,
+      } : null);
 
       setProducts(productsData);
       setWarrantyPolicies(warrantyPoliciesData.filter((policy) => policy.isActive));
@@ -1204,9 +1213,14 @@ export default function SerialsPage() {
    {/* Serial List */}
 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
   <div className="border-b border-slate-200 px-6 py-4">
-    <h2 className="font-bold text-slate-900">
-      Serial List
-    </h2>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="font-bold text-slate-900">Serial List</h2>
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-slate-100 px-3 py-1.5 font-semibold text-slate-700">Total: {serialCounts?.total ?? "—"}</span>
+        <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-700">In Stock: {serialCounts?.inStock ?? "—"}</span>
+        <span className="rounded-full bg-blue-50 px-3 py-1.5 font-semibold text-blue-700">Shipped: {serialCounts?.shipped ?? "—"}</span>
+      </div>
+    </div>
     <form onSubmit={applySerialFilters} className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto_auto]">
       <input
         value={searchInput}
@@ -1252,7 +1266,7 @@ export default function SerialsPage() {
       <table className="w-full min-w-[1300px] text-left">
         <thead className="bg-slate-50">
           <tr>
-            <th className="px-5 py-4 text-xs font-bold uppercase text-slate-500">
+            <th className="w-[120px] whitespace-nowrap px-5 py-4 text-xs font-bold uppercase text-slate-500">
               Serial Number
             </th>
 
@@ -1303,7 +1317,7 @@ export default function SerialsPage() {
     className="hover:bg-slate-50"
   >
     {/* Serial Number */}
-    <td className="px-5 py-4 font-mono font-semibold text-slate-900">
+    <td className="w-[120px] whitespace-nowrap px-5 py-4 font-mono text-xs font-semibold text-slate-900">
       {formatSerial(serial.serialNumber)}
     </td>
 
