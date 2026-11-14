@@ -83,52 +83,21 @@ export default function Sidebar({ authUser, authLoaded }: SidebarProps = {}) {
 
 
 
-        {/* Loading User Area */}
-        <div className="border-b border-slate-800 px-5 py-4">
-          <p className="text-xs uppercase tracking-wider text-slate-500">
-            Signed in as
-          </p>
-
-          <p className="mt-1 font-semibold text-white">
-            User
-          </p>
-
-          <p className="mt-1 text-xs font-medium text-emerald-400">
-            Unknown Role
-          </p>
-        </div>
-
         {/* Loading Menu */}
-        <nav className="flex-1 overflow-y-auto px-4 py-5" />
-
-        {/* Footer */}
-        <div className="border-t border-slate-800 p-5">
-          <div className="rounded-xl bg-slate-800 p-4">
-            <p className="font-semibold text-white">
-              GS Art & Management System
-            </p>
-
-            <p className="mt-1 text-xs text-slate-400">
-              Version 1.0.0
-            </p>
+        <nav className="flex-1 overflow-y-auto px-4 py-5">
+          {/* Footer scrolls with the menu instead of taking fixed screen space. */}
+          <div className="mt-6 border-t border-slate-800 pt-5">
+            <div className="rounded-xl bg-slate-800 p-4">
+              <p className="font-semibold text-white">GS Art & Management System</p>
+              <p className="mt-1 text-xs text-slate-400">Version 1.0.0</p>
+            </div>
           </div>
-        </div>
+        </nav>
       </aside>
     );
   }
 
   const role = currentUser?.role?.trim().toUpperCase() ?? "";
-  const roleLabels: Record<string, string> = {
-    ADMIN: "Admin",
-    BOSS: "Boss",
-    MANAGER: "Manager",
-    WAREHOUSE: "Warehouse",
-    SERVICE: "Service",
-    DEALER: "Dealer",
-    SALES: "Sales",
-    MARKETING: "Marketing",
-  };
-
   const permissions =
     currentUser?.permissions ?? [];
 
@@ -237,22 +206,6 @@ export default function Sidebar({ authUser, authLoaded }: SidebarProps = {}) {
     <aside className="flex h-screen w-72 flex-col bg-slate-900 text-white">
       {/* System Switcher */}<div className="border-b border-slate-800 p-4"><a href="/warehouse/products" className="mb-2 block rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 transition hover:bg-blue-500/20"><p className="text-lg font-bold text-blue-400">MTK Solar</p><p className="mt-1 text-xs text-slate-400">Solar Warehouse System</p></a><a href="/dashboard" className="block rounded-xl bg-slate-800 px-4 py-3 transition hover:bg-slate-700"><p className="text-lg font-bold text-emerald-400">SuntreeMyanmar</p><p className="mt-1 text-xs text-slate-400">Warranty System</p></a></div>
 
-      {/* User Role */}
-      <div className="border-b border-slate-800 px-5 py-4">
-        <p className="text-xs uppercase tracking-wider text-slate-500">
-          Signed in as
-        </p>
-
-        <p className="mt-1 font-semibold text-white">
-          {currentUser?.username ??
-            "User"}
-        </p>
-
-        <p className="mt-1 text-xs font-medium text-emerald-400">
-          {roleLabels[role] ?? (role || "Unknown Role")}
-        </p>
-      </div>
-
       {/* Frequent Suntree stock-out action */}
       {hasPermission("SHIPMENTS_VIEW") && (
         <div className="px-4 pt-4">
@@ -345,20 +298,14 @@ export default function Sidebar({ authUser, authLoaded }: SidebarProps = {}) {
             </p>
           </div>
         )}
-      </nav>
-
-      {/* Footer */}
-      <div className="border-t border-slate-800 p-5">
-        <div className="rounded-xl bg-slate-800 p-4">
-          <p className="font-semibold text-white">
-            GS Art & Management System
-          </p>
-
-          <p className="mt-1 text-xs text-slate-400">
-            Version 1.0.0
-          </p>
+        {/* Footer is part of the scrollable menu, so it appears at the bottom. */}
+        <div className="mt-6 border-t border-slate-800 pt-5">
+          <div className="rounded-xl bg-slate-800 p-4">
+            <p className="font-semibold text-white">GS Art & Management System</p>
+            <p className="mt-1 text-xs text-slate-400">Version 1.0.0</p>
+          </div>
         </div>
-      </div>
+      </nav>
     </aside>
   );
 }
