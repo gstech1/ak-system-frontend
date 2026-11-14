@@ -171,6 +171,21 @@ export default function SerialsPage() {
   const [rangeStartInput, setRangeStartInput] = useState("");
   const [rangeEndInput, setRangeEndInput] = useState("");
   const [status, setStatus] = useState("");
+  const serialTableTopScrollRef = useRef<HTMLDivElement>(null);
+  const serialTableBottomScrollRef = useRef<HTMLDivElement>(null);
+  const serialTableRef = useRef<HTMLTableElement>(null);
+  const [serialTableWidth, setSerialTableWidth] = useState(1300);
+
+  useEffect(() => {
+    const updateSerialTableWidth = () => {
+      const width = serialTableRef.current?.scrollWidth;
+      if (width) setSerialTableWidth(width);
+    };
+
+    updateSerialTableWidth();
+    window.addEventListener("resize", updateSerialTableWidth);
+    return () => window.removeEventListener("resize", updateSerialTableWidth);
+  }, [serials, loading]);
 
   /* ======================================================
      SCANNER
@@ -1262,8 +1277,31 @@ export default function SerialsPage() {
       {search || rangeStart || rangeEnd ? "No serial numbers match this search." : "No serial numbers registered yet."}
     </div>
   ) : (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1300px] text-left">
+    <>
+    <div
+      ref={serialTableTopScrollRef}
+      aria-label="Scroll serial table horizontally"
+      className="overflow-x-auto overflow-y-hidden border-b border-slate-200"
+      onScroll={(event) => {
+        const bottom = serialTableBottomScrollRef.current;
+        if (bottom && bottom.scrollLeft !== event.currentTarget.scrollLeft) {
+          bottom.scrollLeft = event.currentTarget.scrollLeft;
+        }
+      }}
+    >
+      <div style={{ width: `${serialTableWidth}px` }} className="h-4" />
+    </div>
+    <div
+      ref={serialTableBottomScrollRef}
+      className="overflow-x-auto"
+      onScroll={(event) => {
+        const top = serialTableTopScrollRef.current;
+        if (top && top.scrollLeft !== event.currentTarget.scrollLeft) {
+          top.scrollLeft = event.currentTarget.scrollLeft;
+        }
+      }}
+    >
+      <table ref={serialTableRef} className="w-full min-w-[1300px] text-left">
         <thead className="bg-slate-50">
           <tr>
             <th className="w-[120px] whitespace-nowrap px-5 py-4 text-xs font-bold uppercase text-slate-500">
@@ -1473,6 +1511,7 @@ export default function SerialsPage() {
         </tbody>
       </table>
     </div>
+    </>
   )}
   {!loading && totalPages > 0 && (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
