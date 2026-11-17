@@ -270,16 +270,11 @@ export default function WarehousePage() {
         </header>
 
         <section className="mb-8">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">MTK Stock Overview</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {summary?.warehouse ? `${summary.warehouse} · MTK warehouse data` : "Live stock and movement totals"}
-              </p>
-            </div>
-            <button type="button" onClick={() => goTo("/warehouse/reports")} className="text-sm font-bold text-emerald-700 hover:text-emerald-800">
-              View reports →
-            </button>
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-slate-900">MTK Stock Overview</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {summary?.warehouse ? `${summary.warehouse} · MTK warehouse data` : "Live stock and movement totals"}
+            </p>
           </div>
           {summaryError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{summaryError}</div>
@@ -288,16 +283,18 @@ export default function WarehousePage() {
           ) : !summary.warehouse ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">MTK-MAIN warehouse is not configured. Ask an administrator to check the warehouse setup.</div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                ["Current Stock", summary.stock.quantity, "units in warehouse"],
-                ["Stock IN", summary.stockIn.quantity, `${summary.stockIn.transactions} receipts`],
-                ["Sales OUT", summary.salesOut.quantity, `${summary.salesOut.transactions} completed issues`],
-                ["Service Outstanding", summary.serviceIssue.outstandingQuantity, `${summary.serviceIssue.transactions} service issues`],
+                ["Registered Products", summary.products.total, "active products in the product list"],
+                ["Current Stock", summary.stock.quantity, "units currently in the warehouse"],
+                ["Stock IN", summary.stockIn.quantity, `${summary.stockIn.transactions} completed receipts`],
+                ["Sales OUT", summary.salesOut.quantity, `${summary.salesOut.transactions} completed sales issues`],
+                ["Service Outstanding", summary.serviceIssue.outstandingQuantity, `${summary.serviceIssue.transactions} completed service issues`],
+                ["Service Returns", summary.serviceReturn.returnedQuantity, `${summary.serviceReturn.records} records · ${summary.serviceReturn.usedQuantity.toLocaleString()} units used`],
               ].map(([label, amount, detail]) => (
                 <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <p className="text-sm font-semibold text-slate-500">{label}</p>
-                  <p className="mt-2 text-3xl font-black text-slate-900">{amount}</p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">{Number(amount).toLocaleString()}</p>
                   <p className="mt-1 text-xs text-slate-400">{detail}</p>
                 </div>
               ))}
