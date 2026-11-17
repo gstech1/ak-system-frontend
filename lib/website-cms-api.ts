@@ -48,6 +48,85 @@ export function getWebsiteCmsAuthHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export type QuotationListItem = {
+  quotationNo: string;
+  quoteDate: string;
+  customerName: string;
+  customerId: string | null;
+  totalAmount: number | string;
+  createdBy?: { username: string };
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type QuotationRecord = QuotationListItem & {
+  data: Record<string, unknown>;
+};
+
+export type QuotationListResponse = {
+  items: QuotationListItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type SaveQuotationPayload = {
+  quotationNo: string;
+  quoteDate: string;
+  customerName: string;
+  customerId?: string;
+  totalAmount: number;
+  data: Record<string, unknown>;
+};
+
+async function quotationResponse<T>(response: Response): Promise<T> {
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = body?.message;
+    throw new Error(Array.isArray(message) ? message.join(" ") : message || "Quotation request failed.");
+  }
+  return body as T;
+}
+
+export async function getQuotations(search = "", page = 1, limit = 20) {
+  const params = new URLSearchParams({ search, page: String(page), limit: String(limit) });
+  return quotationResponse<QuotationListResponse>(await fetch(`${API_URL}/quotations?${params}`, {
+    headers: getWebsiteCmsAuthHeaders(),
+    cache: "no-store",
+  }));
+}
+
+export async function getQuotation(quotationNo: string) {
+  return quotationResponse<QuotationRecord>(await fetch(`${API_URL}/quotations/${encodeURIComponent(quotationNo)}`, {
+    headers: getWebsiteCmsAuthHeaders(),
+    cache: "no-store",
+  }));
+}
+
+export async function saveQuotation(payload: SaveQuotationPayload, existingQuotationNo?: string) {
+  const isUpdate = Boolean(existingQuotationNo);
+  const headers = new Headers(getWebsiteCmsAuthHeaders());
+  headers.set("Content-Type", "application/json");
+  return quotationResponse<QuotationRecord>(await fetch(
+    isUpdate ? `${API_URL}/quotations/${encodeURIComponent(existingQuotationNo!)}` : `${API_URL}/quotations`,
+    {
+      method: isUpdate ? "PATCH" : "POST",
+      headers,
+      body: JSON.stringify(payload),
+    },
+  ));
+}
+
+export async function uploadQuotationImage(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  return quotationResponse<{ success: boolean; filename: string; path: string }>(await fetch(`${API_URL}/quotations/uploads`, {
+    method: "POST",
+    headers: getWebsiteCmsAuthHeaders(),
+    body: form,
+  }));
+}
+
 export async function getWebsiteProductCategories() {
   const response = await fetch(
     `${API_URL}/website-cms/categories`,

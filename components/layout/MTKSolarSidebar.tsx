@@ -42,6 +42,16 @@ const DASHBOARD_ITEM = {
 
 const MENU_SECTIONS: MenuSection[] = [
   {
+    title: "SALES",
+    items: [
+      {
+        title: "Quotation",
+        href: "/warehouse/quotation",
+        icon: FileText,
+      },
+    ],
+  },
+  {
     title: "PRODUCTS",
     items: [
       {
@@ -88,16 +98,6 @@ const MENU_SECTIONS: MenuSection[] = [
         title: "Stock Count",
         href: "/warehouse/stock-count",
         icon: ClipboardList,
-      },
-    ],
-  },
-  {
-    title: "SALES",
-    items: [
-      {
-        title: "Quotation",
-        href: "/warehouse/quotation",
-        icon: FileText,
       },
     ],
   },
