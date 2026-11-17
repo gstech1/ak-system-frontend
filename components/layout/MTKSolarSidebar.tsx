@@ -18,8 +18,9 @@ import {
 
 type MenuItem = {
   title: string;
-  href: string;
+  href?: string;
   icon: typeof Package;
+  disabled?: boolean;
 };
 
 type MenuSection = {
@@ -87,6 +88,16 @@ const MENU_SECTIONS: MenuSection[] = [
         title: "Stock Count",
         href: "/warehouse/stock-count",
         icon: ClipboardList,
+      },
+    ],
+  },
+  {
+    title: "SALES",
+    items: [
+      {
+        title: "Quotation",
+        href: "/warehouse/quotation",
+        icon: FileText,
       },
     ],
   },
@@ -199,6 +210,11 @@ export default function MTKSolarSidebar() {
       language === "my"
         ? "ဘောက်ချာ"
         : "VOUCHERS",
+
+    salesSection:
+      language === "my"
+        ? "အရောင်း"
+        : "SALES",
 
     voucherHistory:
       language === "my"
@@ -325,6 +341,8 @@ export default function MTKSolarSidebar() {
                   ? t.products
                   : section.title === "WAREHOUSE"
                     ? t.warehouseSection
+                    : section.title === "SALES"
+                      ? t.salesSection
                       : section.title === "VOUCHERS"
                         ? t.vouchers
                         : section.title}
@@ -334,7 +352,7 @@ export default function MTKSolarSidebar() {
 
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.href);
+                  const active = item.href ? isActive(item.href) : false;
 
                   const itemTitle =
                     item.title === "Product List"
@@ -365,9 +383,25 @@ export default function MTKSolarSidebar() {
                                     ? t.voucherHistory
                                     : item.title;
 
+                  if (item.disabled) {
+                    return (
+                      <button
+                        key={item.title}
+                        type="button"
+                        disabled
+                        aria-label={`${item.title}, coming soon`}
+                        className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-500 opacity-80"
+                      >
+                        <Icon size={18} />
+                        <span className="font-medium">{itemTitle}</span>
+                        <span className="ml-auto rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-400">Soon</span>
+                      </button>
+                    );
+                  }
+
                   return (
                     <a
-                      key={item.href}
+                      key={item.href || item.title}
                       href={item.href}
                       className={
                         "flex items-center gap-3 rounded-xl px-4 py-3 " +

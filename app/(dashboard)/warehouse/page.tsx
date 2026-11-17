@@ -27,6 +27,7 @@ type ActionItem = {
   description: string;
   icon: typeof PackageSearch;
   href: string;
+  disabled?: boolean;
 };
 
 type MtkSummary = {
@@ -137,6 +138,12 @@ export default function WarehousePage() {
       icon: RotateCcw,
       href: "/warehouse/service-return",
     },
+    {
+      title: "Quotation",
+      description: "Build and print customer quotations",
+      icon: FileText,
+      href: "/warehouse/quotation",
+    },
     
   ];
 
@@ -206,8 +213,12 @@ export default function WarehousePage() {
       <button
         key={action.title}
         type="button"
-        onClick={() => goTo(action.href)}
-        className="group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+        onClick={() => {
+          if (!action.disabled) goTo(action.href);
+        }}
+        disabled={action.disabled}
+        aria-label={action.disabled ? `${action.title}, coming soon` : action.title}
+        className={`group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 ${action.disabled ? "cursor-not-allowed opacity-70" : "hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"}`}
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition duration-200 group-hover:bg-emerald-600 group-hover:text-white">
@@ -227,9 +238,15 @@ export default function WarehousePage() {
             </p>
           </div>
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition group-hover:bg-emerald-50 group-hover:text-emerald-600">
-            <ArrowRight size={15} />
-          </div>
+          {action.disabled ? (
+            <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+              Soon
+            </span>
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition group-hover:bg-emerald-50 group-hover:text-emerald-600">
+              <ArrowRight size={15} />
+            </div>
+          )}
         </div>
       </button>
     );
