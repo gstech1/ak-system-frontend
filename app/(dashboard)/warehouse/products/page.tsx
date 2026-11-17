@@ -9,6 +9,7 @@ import {
   Barcode,
   Package,
   PackagePlus,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -35,6 +36,7 @@ type OtherProduct = {
   unit: string;
   warrantyMonths: number;
   sellingPrice: string;
+  purchasePrice?: string | null;
   barcodeType: "FACTORY" | "INTERNAL";
   isActive: boolean;
   createdAt: string;
@@ -45,6 +47,17 @@ type AuthUser = {
   role?: string;
 };
 
+type ProductEditDraft = {
+  productName: string;
+  category: string;
+  brand: string;
+  model: string;
+  unit: string;
+  warrantyMonths: string;
+  sellingPrice: string;
+  purchasePrice: string;
+};
+
 export default function ProductListPage() {
   const [products, setProducts] = useState<OtherProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +65,10 @@ export default function ProductListPage() {
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canEditProducts, setCanEditProducts] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<OtherProduct | null>(null);
+  const [editDraft, setEditDraft] = useState<ProductEditDraft | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -88,17 +105,34 @@ export default function ProductListPage() {
   }
 
   useEffect(() => {
-    try {
-      const authUser = localStorage.getItem("authUser");
-      if (authUser) {
-        const parsedUser = JSON.parse(authUser) as AuthUser;
-        setIsAdmin(String(parsedUser.role || "").toUpperCase() === "ADMIN");
+    let cancelled = false;
+    const roleCheck = window.setTimeout(() => {
+      try {
+        const authUser = localStorage.getItem("authUser");
+        if (authUser) {
+          const parsedUser = JSON.parse(authUser) as AuthUser;
+          const role = String(parsedUser.role || "").toUpperCase();
+          if (!cancelled) {
+            setIsAdmin(role === "ADMIN");
+            setCanEditProducts(["ADMIN", "BOSS", "MANAGER"].includes(role));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setIsAdmin(false);
+          setCanEditProducts(false);
+        }
       }
-    } catch {
-      setIsAdmin(false);
-    }
+    }, 0);
 
-    loadProducts();
+    const productLoad = window.setTimeout(() => {
+      if (!cancelled) void loadProducts();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(roleCheck);
+      window.clearTimeout(productLoad);
+    };
   }, []);
 
   async function deleteProduct(product: OtherProduct) {
@@ -147,6 +181,79 @@ export default function ProductListPage() {
       );
     } finally {
       setDeletingProductId(null);
+    }
+  }
+
+  function openEditProduct(product: OtherProduct) {
+    setEditingProduct(product);
+    setEditDraft({
+      productName: product.productName,
+      category: product.category,
+      brand: product.brand || "",
+      model: product.model || "",
+      unit: product.unit,
+      warrantyMonths: String(product.warrantyMonths),
+      sellingPrice: String(product.sellingPrice),
+      purchasePrice: product.purchasePrice == null ? "" : String(product.purchasePrice),
+    });
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  async function saveProductEdit() {
+    if (!editingProduct || !editDraft) return;
+    if (!editDraft.productName.trim() || !editDraft.category.trim() || !editDraft.unit.trim()) {
+      setErrorMessage("Product name, category, and unit are required.");
+      return;
+    }
+
+    const warrantyMonths = Number(editDraft.warrantyMonths);
+    const sellingPrice = Number(editDraft.sellingPrice);
+    const purchasePrice = editDraft.purchasePrice.trim() === "" ? null : Number(editDraft.purchasePrice);
+    if (!Number.isInteger(warrantyMonths) || warrantyMonths < 0 ||
+        !Number.isFinite(sellingPrice) || sellingPrice < 0 ||
+        (purchasePrice !== null && (!Number.isFinite(purchasePrice) || purchasePrice < 0))) {
+      setErrorMessage("Warranty and prices must be valid non-negative numbers.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setErrorMessage("");
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) throw new Error("Login session not found. Please sign in again.");
+
+      const response = await fetch(
+        `${API_URL}/other-products/${encodeURIComponent(editingProduct.id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            productName: editDraft.productName.trim(),
+            category: editDraft.category.trim(),
+            brand: editDraft.brand.trim() || null,
+            model: editDraft.model.trim() || null,
+            unit: editDraft.unit.trim(),
+            warrantyMonths,
+            sellingPrice,
+            purchasePrice,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || "Unable to update product.");
+
+      setProducts((current) => current.map((item) => item.id === editingProduct.id ? { ...item, ...data } : item));
+      setSuccessMessage(`${data.productName} updated successfully.`);
+      setEditingProduct(null);
+      setEditDraft(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update product.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -386,7 +493,7 @@ export default function ProductListPage() {
                           Status
                         </th>
 
-                        {isAdmin && (
+                        {(isAdmin || canEditProducts) && (
                           <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
                             Action
                           </th>
@@ -538,9 +645,21 @@ export default function ProductListPage() {
                               </span>
                             </td>
 
-                            {isAdmin && (
+                            {(isAdmin || canEditProducts) && (
                               <td className="px-5 py-4">
-                                <button
+                                <div className="flex items-center gap-2">
+                                {canEditProducts && <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openEditProduct(product);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                  <Pencil size={14} />
+                                  Edit
+                                </button>}
+                                {isAdmin && <button
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -551,7 +670,8 @@ export default function ProductListPage() {
                                 >
                                   <Trash2 size={14} />
                                   {deletingProductId === product.id ? "Deleting..." : "Delete"}
-                                </button>
+                                </button>}
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -605,6 +725,35 @@ export default function ProductListPage() {
           </div>
         </div>
       </div>
+      {editingProduct && editDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-product-title">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="edit-product-title" className="text-xl font-bold text-slate-900">Edit Product</h2>
+                <p className="mt-1 text-sm text-slate-500">Product code and barcode behavior stay unchanged to protect stock history.</p>
+              </div>
+              <button type="button" onClick={() => { setEditingProduct(null); setEditDraft(null); }} disabled={savingEdit} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">Cancel</button>
+            </div>
+            {errorMessage && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</p>}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {([
+                ["Product Name", "productName"], ["Category", "category"], ["Brand", "brand"], ["Model", "model"],
+                ["Unit", "unit"], ["Warranty (months)", "warrantyMonths"], ["Selling Price", "sellingPrice"], ["Purchase Price", "purchasePrice"],
+              ] as const).map(([label, key]) => (
+                <label key={key} className="block text-sm font-semibold text-slate-700">
+                  {label}
+                  <input type={key === "sellingPrice" || key === "purchasePrice" || key === "warrantyMonths" ? "number" : "text"} min={key === "warrantyMonths" ? 0 : undefined} step={key === "sellingPrice" || key === "purchasePrice" ? "0.01" : "1"} value={editDraft[key]} onChange={(event) => setEditDraft((current) => current ? { ...current, [key]: event.target.value } : current)} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+                </label>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => { setEditingProduct(null); setEditDraft(null); }} disabled={savingEdit} className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={() => void saveProductEdit()} disabled={savingEdit} className="rounded-lg bg-emerald-600 px-5 py-2 font-semibold text-white disabled:opacity-50">{savingEdit ? "Saving..." : "Save Changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </MTKSolarShell>
   );
 }
