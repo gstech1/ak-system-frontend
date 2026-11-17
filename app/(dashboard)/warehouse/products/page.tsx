@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import MTKSolarShell from "@/components/layout/MTKSolarShell";
 
@@ -20,6 +20,7 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5001"
 ).replace(/\/+$/, "");
+const PAGE_SIZE = 10;
 
 type WarehouseStock = {
   quantity: number;
@@ -63,7 +64,12 @@ export default function ProductListPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+  const [tableViewportWidth, setTableViewportWidth] = useState(0);
+  const tableTopScrollRef = useRef<HTMLDivElement>(null);
+  const tableBottomScrollRef = useRef<HTMLDivElement>(null);
+  const productTableRef = useRef<HTMLTableElement>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [canEditProducts, setCanEditProducts] = useState(false);
   const [editingProduct, setEditingProduct] = useState<OtherProduct | null>(null);
@@ -172,6 +178,14 @@ export default function ProductListPage() {
       setProducts((currentProducts) =>
         currentProducts.filter((item) => item.id !== product.id),
       );
+      const remainingFilteredCount = filteredProducts.filter(
+        (item) => item.id !== product.id,
+      ).length;
+      const lastPageAfterDelete = Math.max(
+        1,
+        Math.ceil(remainingFilteredCount / PAGE_SIZE),
+      );
+      setCurrentPage((page) => Math.min(page, lastPageAfterDelete));
       setSuccessMessage(
         "Product removed from the active list. Stock IN history was kept.",
       );
@@ -283,10 +297,40 @@ export default function ProductListPage() {
     );
   });
 
+  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const visibleProducts = filteredProducts.slice(
-    0,
-    visibleCount,
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
   );
+  const pageButtons: (number | "ellipsis")[] = totalPages <= 7
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : [
+        1,
+        ...(currentPage > 3 ? ["ellipsis" as const] : []),
+        ...Array.from(
+          { length: Math.max(0, Math.min(totalPages - 1, currentPage + 1) - Math.max(2, currentPage - 1) + 1) },
+          (_, index) => Math.max(2, currentPage - 1) + index,
+        ),
+        ...(currentPage < totalPages - 2 ? ["ellipsis" as const] : []),
+        totalPages,
+      ];
+
+  useEffect(() => {
+    const viewport = tableBottomScrollRef.current;
+    const table = productTableRef.current;
+    if (!viewport || !table) return;
+
+    const updateDimensions = () => {
+      setTableScrollWidth(table.scrollWidth);
+      setTableViewportWidth(viewport.clientWidth);
+    };
+
+    updateDimensions();
+    const observer = new ResizeObserver(updateDimensions);
+    observer.observe(viewport);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [loading, filteredProducts.length, currentPage]);
 
   return (
     <MTKSolarShell>
@@ -338,7 +382,7 @@ export default function ProductListPage() {
                   value={search}
                   onChange={(event) => {
                     setSearch(event.target.value);
-                    setVisibleCount(10);
+                    setCurrentPage(1);
                   }}
                   placeholder="Search by barcode, product, category, brand or model..."
                   className="h-12 w-full rounded-xl border border-slate-300 bg-slate-50 pl-12 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
@@ -445,8 +489,30 @@ export default function ProductListPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1320px] text-left">
+                <div
+                  ref={tableTopScrollRef}
+                  aria-label="Scroll product table horizontally"
+                  className={`overflow-x-auto overflow-y-hidden border-b border-slate-200 ${tableScrollWidth > tableViewportWidth ? "" : "hidden"}`}
+                  onScroll={(event) => {
+                    const bottom = tableBottomScrollRef.current;
+                    if (bottom && bottom.scrollLeft !== event.currentTarget.scrollLeft) {
+                      bottom.scrollLeft = event.currentTarget.scrollLeft;
+                    }
+                  }}
+                >
+                  <div style={{ width: `${tableScrollWidth}px` }} className="h-4" />
+                </div>
+                <div
+                  ref={tableBottomScrollRef}
+                  className="overflow-x-auto"
+                  onScroll={(event) => {
+                    const top = tableTopScrollRef.current;
+                    if (top && top.scrollLeft !== event.currentTarget.scrollLeft) {
+                      top.scrollLeft = event.currentTarget.scrollLeft;
+                    }
+                  }}
+                >
+                  <table ref={productTableRef} className="w-full min-w-[1320px] text-left">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
                         <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -681,33 +747,45 @@ export default function ProductListPage() {
                   </table>
                 </div>
 
-                {/* SHOW MORE */}
-
-                {filteredProducts.length > visibleCount && (
-                  <div className="flex justify-center border-t border-slate-200 bg-slate-50 px-6 py-5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setVisibleCount(
-                          (current) => current + 10,
-                        )
-                      }
-                      className="inline-flex min-w-[150px] items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
-                    >
-                      SHOW MORE
-                    </button>
+                {totalPages > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+                    <p className="text-sm text-slate-600">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length}
+                    </p>
+                    <nav aria-label="Product list pages" className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                        disabled={currentPage === 1}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      {pageButtons.map((page, index) => page === "ellipsis" ? (
+                        <span key={`ellipsis-${index}`} className="px-2 text-slate-400" aria-hidden="true">…</span>
+                      ) : (
+                        <button
+                          key={page}
+                          type="button"
+                          onClick={() => setCurrentPage(page)}
+                          aria-label={`Page ${page}`}
+                          aria-current={currentPage === page ? "page" : undefined}
+                          className={`min-w-10 rounded-lg border px-3 py-2 text-sm font-semibold transition ${currentPage === page ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-emerald-500 hover:text-emerald-700"}`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                        disabled={currentPage === totalPages}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </nav>
                   </div>
                 )}
-
-                {/* ALL PRODUCTS SHOWN */}
-
-                {filteredProducts.length > 10 &&
-                  visibleCount >=
-                    filteredProducts.length && (
-                    <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 text-center text-xs font-semibold text-slate-400">
-                      ALL PRODUCTS SHOWN
-                    </div>
-                  )}
               </>
             )}
           </div>
