@@ -29,6 +29,7 @@ type Product = {
   sellingPrice: string | number;
   barcodeType?: string | null;
   trackingType?: string | null;
+  isActive?: boolean;
   stockBalances?: {
     quantity: number;
     warehouseId: string;
@@ -36,6 +37,7 @@ type Product = {
 };
 
 type SaleItem = {
+  lineId: string;
   id: string;
   productCode: string;
   productName: string;
@@ -44,6 +46,7 @@ type SaleItem = {
   price: number;
   availableStock: number;
   warehouseId: string;
+  trackingType?: string | null;
 };
 
 export default function SalesPage() {
@@ -143,20 +146,66 @@ export default function SalesPage() {
     setMessageType("");
 
     try {
-      const product = products.find(
-        (item) =>
-          item.productCode
-            .toLowerCase() ===
-            searchValue.toLowerCase() ||
-          item.productCode
-            .toLowerCase()
-            .includes(searchValue.toLowerCase()),
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setMessage("Login session not found. Please login again.");
+        setMessageType("error");
+        return;
+      }
+
+      let barcodeLookup: { product: Product; matchedUnitBarcode: boolean } | null = null;
+      const barcodeResponse = await fetch(
+        `${API_BASE_URL}/other-products/barcode/${encodeURIComponent(searchValue)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        },
       );
+      if (barcodeResponse.ok) {
+        barcodeLookup = await barcodeResponse.json();
+      } else if (barcodeResponse.status !== 404) {
+        const data = await barcodeResponse.json().catch(() => null);
+        throw new Error(data?.message || "Unable to check this product barcode.");
+      }
+
+      const normalizedSearch = searchValue.toLocaleLowerCase();
+      const exactMatch = products.find(
+        (item) => item.productCode.trim().toLocaleLowerCase() === normalizedSearch,
+      );
+      const matchingProducts = barcodeLookup
+        ? [barcodeLookup.product]
+        : exactMatch
+        ? [exactMatch]
+        : products.filter((item) =>
+            [item.productCode, item.productName, item.category, item.brand, item.model]
+              .some((value) => value?.toLocaleLowerCase().includes(normalizedSearch)),
+          );
+
+      if (matchingProducts.length > 1) {
+        setMessage("More than one product matches. Enter the full product code or a more specific name.");
+        setMessageType("error");
+        return;
+      }
+
+      const product = matchingProducts[0];
 
       if (!product) {
         setMessage(
           `Product not found: ${searchValue}`,
         );
+        setMessageType("error");
+        return;
+      }
+
+      if (product.isActive === false) {
+        setMessage(`${product.productName} is inactive and cannot be added to a sale.`);
+        setMessageType("error");
+        return;
+      }
+
+      const matchedUnitBarcode = barcodeLookup?.matchedUnitBarcode ?? false;
+      if (product.trackingType === "UNIT" && !matchedUnitBarcode) {
+        setMessage("This product is tracked by serial barcode. Scan or enter the exact unit barcode to add it to a sale.");
         setMessageType("error");
         return;
       }
@@ -176,7 +225,7 @@ export default function SalesPage() {
 
       if (!warehouseId) {
         setMessage(
-          `${product.productName} has no warehouse stock record.`,
+          `${product.productName} is in the Product List, but no stock-in balance is recorded in MTK Main Warehouse. Record Stock IN before adding it to a sale.`,
         );
         setMessageType("error");
         return;
@@ -194,9 +243,24 @@ export default function SalesPage() {
         product.sellingPrice || 0,
       );
 
-      const existingItem = items.find(
-        (item) => item.id === product.id,
-      );
+      if (matchedUnitBarcode && items.some((item) => item.trackingType === "UNIT" && item.barcode === searchValue)) {
+        setMessage("This unit barcode is already in the sale.");
+        setMessageType("error");
+        return;
+      }
+
+      const selectedUnitCount = items.filter(
+        (item) => item.id === product.id && item.trackingType === "UNIT",
+      ).length;
+      if (matchedUnitBarcode && selectedUnitCount >= availableStock) {
+        setMessage(`Insufficient stock. Available: ${availableStock}`);
+        setMessageType("error");
+        return;
+      }
+
+      const existingItem = matchedUnitBarcode
+        ? undefined
+        : items.find((item) => item.id === product.id);
 
       if (existingItem) {
         if (
@@ -225,16 +289,18 @@ export default function SalesPage() {
         setItems((current) => [
           ...current,
           {
+            lineId: crypto.randomUUID(),
             id: product.id,
             productCode:
               product.productCode,
             productName:
               product.productName,
-            barcode: searchValue,
+            barcode: matchedUnitBarcode ? searchValue : exactMatch ? searchValue : product.productCode,
             quantity: 1,
             price,
             availableStock,
             warehouseId,
+            trackingType: product.trackingType,
           },
         ]);
       }
@@ -280,12 +346,12 @@ export default function SalesPage() {
   ========================================================= */
 
   const updateQuantity = (
-    id: string,
+    lineId: string,
     amount: number,
   ) => {
     setItems((current) =>
       current.map((item) => {
-        if (item.id !== id) {
+        if (item.lineId !== lineId || item.trackingType === "UNIT") {
           return item;
         }
 
@@ -312,10 +378,10 @@ export default function SalesPage() {
      REMOVE ITEM
   ========================================================= */
 
-  const removeItem = (id: string) => {
+  const removeItem = (lineId: string) => {
     setItems((current) =>
       current.filter(
-        (item) => item.id !== id,
+        (item) => item.lineId !== lineId,
       ),
     );
   };
@@ -701,7 +767,7 @@ export default function SalesPage() {
             <div className="divide-y divide-slate-100">
               {items.map((item) => (
                 <div
-                  key={item.id}
+                  key={item.lineId}
                   className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
                 >
                   {/* PRODUCT INFO */}
@@ -733,7 +799,7 @@ export default function SalesPage() {
                         type="button"
                         onClick={() =>
                           updateQuantity(
-                            item.id,
+                            item.lineId,
                             -1,
                           )
                         }
@@ -753,13 +819,13 @@ export default function SalesPage() {
                         type="button"
                         onClick={() =>
                           updateQuantity(
-                            item.id,
+                            item.lineId,
                             1,
                           )
                         }
                         disabled={
-                          item.quantity >=
-                          item.availableStock
+                          item.trackingType === "UNIT" ||
+                          item.quantity >= item.availableStock
                         }
                         className="flex h-10 w-10 items-center justify-center text-slate-500 hover:text-emerald-600 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
@@ -787,7 +853,7 @@ export default function SalesPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        removeItem(item.id)
+                        removeItem(item.lineId)
                       }
                       className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-50 hover:text-red-500"
                     >
