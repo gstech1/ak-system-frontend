@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
-  BarChart3,
   Boxes,
   ClipboardList,
   FileText,
@@ -98,16 +97,6 @@ const MENU_SECTIONS: MenuSection[] = [
         title: "Voucher History",
         href: "/warehouse/vouchers",
         icon: FileText,
-      },
-    ],
-  },
-  {
-    title: "REPORTS",
-    items: [
-      {
-        title: "Reports",
-        href: "/warehouse/reports",
-        icon: BarChart3,
       },
     ],
   },
@@ -215,16 +204,6 @@ export default function MTKSolarSidebar() {
       language === "my"
         ? "ဘောက်ချာမှတ်တမ်း"
         : "Voucher History",
-
-    reports:
-      language === "my"
-        ? "အစီရင်ခံစာ"
-        : "REPORTS",
-
-    report:
-      language === "my"
-        ? "အစီရင်ခံစာများ"
-        : "Reports",
 
     dashboard:
       language === "my"
@@ -346,10 +325,8 @@ export default function MTKSolarSidebar() {
                   ? t.products
                   : section.title === "WAREHOUSE"
                     ? t.warehouseSection
-                    : section.title === "VOUCHERS"
-                      ? t.vouchers
-                      : section.title === "REPORTS"
-                        ? t.reports
+                      : section.title === "VOUCHERS"
+                        ? t.vouchers
                         : section.title}
               </p>
 
@@ -386,10 +363,7 @@ export default function MTKSolarSidebar() {
                                   : item.title ===
                                       "Voucher History"
                                     ? t.voucherHistory
-                                    : item.title ===
-                                        "Reports"
-                                      ? t.report
-                                      : item.title;
+                                    : item.title;
 
                   return (
                     <a
