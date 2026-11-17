@@ -47,15 +47,43 @@ type QuoteItem = {
 };
 
 const PRODUCT_GROUPS = [
-  { value: "inverter", label: "Inverter", slugs: ["inverter", "inverters"] },
-  { value: "battery", label: "Battery System", slugs: ["battery", "battery-system", "batteries"] },
-  { value: "solar", label: "Solar System", slugs: ["solar", "solar-system", "solar-panel", "solar-panels", "solar-power-system", "solar-solutions"] },
-  {
-    value: "circuit-protection",
-    label: "Circuit Protection",
-    slugs: ["dc-circuit-breaker", "ac-circuit-breaker", "dc-spd", "dc-isolator", "ats", "ac-voltage-protector"],
-  },
+  { value: "inverter", label: "Inverter" },
+  { value: "solar", label: "Solar System" },
+  { value: "battery", label: "Battery System" },
 ] as const;
+
+const BOM_PRESETS = [
+  { title: "Tomzn DB Box 15way", unit: "pcs" },
+  { title: "Tomzn DB Box 18ways", unit: "pcs" },
+  { title: "Suntree ATS Breaker", unit: "pcs" },
+  { title: "Suntree VA Protector", unit: "pcs" },
+  { title: "Suntree AC Breaker", unit: "pcs" },
+  { title: "Suntree DC MCB", unit: "pcs" },
+  { title: "Tomzn DC SPD", unit: "pcs" },
+  { title: "Suntree Fuse Holder + DC Fuse", unit: "pcs" },
+  { title: "Suntree DC MCCB", unit: "pcs" },
+  { title: "Rail 2.4m", unit: "pcs" },
+  { title: "Mid Clamp", unit: "pcs" },
+  { title: "End Clamp", unit: "pcs" },
+  { title: "L-Feet", unit: "pcs" },
+  { title: "Suntree MC4 Connector", unit: "pcs" },
+  { title: "AC Cable", unit: "m" },
+  { title: "Suntree DC Cable", unit: "m" },
+  { title: "DC Cable", unit: "m" },
+  { title: "6mm Earth Cable", unit: "m" },
+  { title: "Earthing System Installation (Earth Rod 3pcs)", unit: "set" },
+  { title: "Pipe, Trunking & Other Accessories", unit: "set" },
+  { title: "Battery, Inverter & AC Safety Device Installation", unit: "job" },
+  { title: "Solar & DC Safety Device Installation", unit: "job" },
+] as const;
+
+function getProductGroup(category: WebsiteCategory) {
+  const source = `${category.slug} ${category.title}`.toLowerCase();
+  if (source.includes("inverter")) return "inverter";
+  if (source.includes("batter")) return "battery";
+  if (source.includes("solar") || source.includes("panel") || source.includes("pv module")) return "solar";
+  return null;
+}
 
 const DEFAULT_WARRANTY_PARAGRAPHS = [
   "Inverter အာမခံကာလသည် ရွေးချယ်ထားသော Model နှင့် ထုတ်လုပ်သူ၏ စည်းကမ်းချက်အလိုက် သတ်မှတ်ပါသည်။ Warranty ကာလအတွင်း ထုတ်လုပ်မှုဆိုင်ရာချို့ယွင်းချက်ကို စစ်ဆေးအတည်ပြုနိုင်ပါက သက်ဆိုင်ရာအာမခံစည်းကမ်းအတိုင်း ပြုပြင်/အစားထိုးဝန်ဆောင်မှု ပေးပါမည်။ SUNTREE Circuit Breaker များအတွက် ဝယ်ယူသည့်နေ့တွင် Online Warranty Registration ပြုလုပ်ထားရန် လိုအပ်ပြီး သက်ဆိုင်ရာ Model နှင့် Warranty Policy အလိုက် အကျုံးဝင်ပါသည်။",
@@ -101,6 +129,7 @@ function Letterhead({ small = false }: { small?: boolean }) {
         <p className="text-xs font-bold tracking-[0.18em] text-emerald-800">MTK SOLAR ENERGY GROUP</p>
         <p className="mt-1 text-[10px] text-slate-600">No. 141, Parami Road, South Okkalapa Township, Yangon</p>
         <p className="text-[10px] text-slate-600">09 880 921 643 · 09 777 499 600</p>
+        <p className="text-[9px] text-slate-500">Customer Service: 09 880 921 646–649</p>
       </div>
       <Image src="/images/logo/mtk-solar-energy.png" alt="MTK Solar Energy" width={160} height={160} priority unoptimized className={`${small ? "h-12" : "h-16"} max-w-[38%] object-contain object-right`} />
     </div>
@@ -154,8 +183,9 @@ export default function QuotationPage() {
   const [categories, setCategories] = useState<WebsiteCategory[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<string>(PRODUCT_GROUPS[0].value);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<Record<string, string>>({});
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [imageError, setImageError] = useState("");
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState("");
@@ -170,6 +200,7 @@ export default function QuotationPage() {
   const [bankInformation, setBankInformation] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("တပ်ဆင်ရန် အတည်ပြုပြီးပါက စရံငွေ 30% ပေးချေရမည်ဖြစ်ပြီး Site အပ်နှံပြီးချိန်တွင် ကျန်ငွေအားလုံး ပေးချေရပါမည်။");
   const [priceNote, setPriceNote] = useState("ဈေးနှုန်းများသည် ဈေးကွက်အပြောင်းအလဲအရ ပြောင်းလဲနိုင်ပါသည်။");
+  const [warrantyParagraphs, setWarrantyParagraphs] = useState<string[]>(DEFAULT_WARRANTY_PARAGRAPHS);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,18 +219,14 @@ export default function QuotationPage() {
 
   const catalogProducts = useMemo<QuotationProduct[]>(() => {
     return categories.flatMap((category) => {
-      const group = PRODUCT_GROUPS.find((option) =>
-        (option.slugs as readonly string[]).includes(category.slug),
-      );
-      if (!group || category.isPublished === false) return [];
+      const categoryGroup = getProductGroup(category);
+      if (!categoryGroup || category.isPublished === false) return [];
       return (category.products || [])
         .filter((product) => product.isPublished !== false)
-        .map((product) => ({ ...product, categoryTitle: category.title, categoryGroup: group.value }));
+        .map((product) => ({ ...product, categoryTitle: category.title, categoryGroup }));
     });
   }, [categories]);
 
-  const productsInGroup = catalogProducts.filter((product) => product.categoryGroup === selectedGroup);
-  const selectedProduct = productsInGroup.find((product) => product.id === selectedProductId);
   const netTotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const discountAmount = Math.min(netTotal, Math.max(0, Number(discount) || 0));
   const totalAmount = Math.max(0, netTotal - discountAmount);
@@ -214,7 +241,8 @@ export default function QuotationPage() {
     return pages;
   }, [items]);
 
-  function addCatalogProduct() {
+  function addCatalogProduct(groupId: string) {
+    const selectedProduct = catalogProducts.find((product) => product.id === selectedProductIds[groupId]);
     if (!selectedProduct) return;
     setItems((current) => {
       const existing = current.find((item) => item.productId === selectedProduct.id);
@@ -227,8 +255,8 @@ export default function QuotationPage() {
         id: makeId(),
         productId: selectedProduct.id,
         categoryTitle: selectedProduct.categoryTitle,
-        title: selectedProduct.title,
-        model: selectedProduct.slug,
+        title: selectedProduct.categoryTitle,
+        model: selectedProduct.title,
         description: selectedProduct.description || "",
         mainImage: selectedProduct.mainImage ? getWebsiteCmsImageUrl(selectedProduct.mainImage) : "",
         specificationImage: selectedProduct.specificationImage ? getWebsiteCmsImageUrl(selectedProduct.specificationImage) : "",
@@ -246,8 +274,35 @@ export default function QuotationPage() {
     }]);
   }
 
+  function addPresetItem() {
+    const preset = BOM_PRESETS[Number(selectedPreset)];
+    if (!preset) return;
+    setItems((current) => [...current, {
+      id: makeId(), categoryTitle: "Accessories / Installation", title: preset.title, model: "", description: "", mainImage: "", specificationImage: "", quantity: "1", unit: preset.unit, unitPrice: "0", warrantyTerm: "",
+    }]);
+  }
+
   function updateItem(id: string, changes: Partial<QuoteItem>) {
     setItems((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
+  }
+
+  function uploadItemImage(id: string, field: "mainImage" | "specificationImage", file?: File) {
+    setImageError("");
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setImageError("ပုံဖိုင် 8 MB ထက်မကျော်စေရပါ။ ပိုသေးတဲ့ပုံကိုရွေးပါ။");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") updateItem(id, { [field]: reader.result });
+    };
+    reader.onerror = () => setImageError("ပုံဖိုင်ဖတ်မရပါ။ နောက်တစ်ကြိမ်ပြန်ရွေးပါ။");
+    reader.readAsDataURL(file);
+  }
+
+  function updateWarrantyParagraph(index: number, value: string) {
+    setWarrantyParagraphs((current) => current.map((paragraph, itemIndex) => itemIndex === index ? value : paragraph));
   }
 
   const dateLabel = quoteDate ? new Date(`${quoteDate}T12:00:00`).toLocaleDateString("en-GB") : "";
@@ -281,36 +336,50 @@ export default function QuotationPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-              <div className="mb-5"><h2 className="font-bold text-slate-900">Select products</h2><p className="text-sm text-slate-500">Products are loaded from the published SuntreeMyanmar website catalog. Photos and specification sheets are attached to the following pages automatically.</p></div>
-              {catalogError && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not load website products: {catalogError}</p>}
-              <div className="grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
-                <label className="text-sm font-semibold text-slate-700">Product group<select value={selectedGroup} onChange={(event) => { setSelectedGroup(event.target.value); setSelectedProductId(""); }} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal">{PRODUCT_GROUPS.map((group) => <option key={group.value} value={group.value}>{group.label}</option>)}</select></label>
-                <label className="text-sm font-semibold text-slate-700">Website product<select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)} disabled={catalogLoading || productsInGroup.length === 0} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100">{catalogLoading ? <option>Loading products...</option> : productsInGroup.length === 0 ? <option value="">No published products in this group</option> : <><option value="">Choose a product</option>{productsInGroup.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}</>}</select></label>
-                <button type="button" onClick={addCatalogProduct} disabled={!selectedProduct} className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={17} /> Add</button>
+            <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
+              <div className="mb-5"><h2 className="font-bold text-slate-900">အဓိကပစ္စည်း မော်ဒယ်ရွေးရန်</h2><p className="text-sm text-slate-500">Website catalog ထဲက Inverter, Battery နဲ့ Solar မော်ဒယ်တွေကို ကြိုတင်ယူထားပါတယ်။ ရွေးပြီး Add နှိပ်တာနဲ့ Excel ပုံစံစာရင်းထဲ ဝင်ပါမယ်။</p></div>
+              {catalogError && <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Website product စာရင်း မရသေးပါ။ ခဏနေရင် Refresh လုပ်ပါ၊ သို့မဟုတ် အောက်က Add item မှာ ကိုယ်တိုင်ဖြည့်ပါ။ ({catalogError})</p>}
+              <div className="grid gap-4 lg:grid-cols-3">
+                {PRODUCT_GROUPS.map((group) => {
+                  const products = catalogProducts.filter((product) => product.categoryGroup === group.value);
+                  return <div key={group.value} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="block text-sm font-bold text-slate-700">{group.label}
+                      <select value={selectedProductIds[group.value] || ""} onChange={(event) => setSelectedProductIds((current) => ({ ...current, [group.value]: event.target.value }))} disabled={catalogLoading || products.length === 0} className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100">
+                        <option value="">{catalogLoading ? "Loading models…" : products.length ? "Model ရွေးပါ" : "Website catalog မှာ မရှိသေးပါ"}</option>
+                        {products.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}
+                      </select>
+                    </label>
+                    <button type="button" onClick={() => addCatalogProduct(group.value)} disabled={!selectedProductIds[group.value]} className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={16} /> Add to quotation</button>
+                  </div>;
+                })}
               </div>
-              <button type="button" onClick={addCustomItem} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Plus size={16} /> Add custom material / service</button>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold text-slate-900">Quotation items <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">{items.length}</span></h2></div>
-              {items.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">Choose products above to begin the quotation.</div> : <div className="divide-y divide-slate-200">{items.map((item, index) => (
-                <div key={item.id} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_120px_120px_160px_auto] lg:items-end">
-                  <div className="flex min-w-0 gap-3">
-                    {item.mainImage ? <Image src={item.mainImage} alt="" width={64} height={64} unoptimized className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-1" /> : <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs text-slate-400">Item</div>}
-                    <div className="min-w-0 flex-1">
-                      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-emerald-700">{item.categoryTitle} · {String(index + 1).padStart(2, "0")}</p>
-                      <input value={item.title} onChange={(event) => updateItem(item.id, { title: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-semibold" placeholder="Product / service name" />
-                      <input value={item.model} onChange={(event) => updateItem(item.id, { model: event.target.value })} className="mt-2 h-9 w-full rounded-lg border border-slate-200 px-3 text-xs" placeholder="Model / specification" />
-                      <input value={item.warrantyTerm} onChange={(event) => updateItem(item.id, { warrantyTerm: event.target.value })} className="mt-2 h-9 w-full rounded-lg border border-slate-200 px-3 text-xs" placeholder="Warranty term for this model (optional)" />
-                    </div>
-                  </div>
-                  <label className="text-xs font-semibold text-slate-600">Quantity<input type="number" min="0" step="any" value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                  <label className="text-xs font-semibold text-slate-600">Unit<input value={item.unit} onChange={(event) => updateItem(item.id, { unit: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                  <label className="text-xs font-semibold text-slate-600">Unit price (MMK)<input type="number" min="0" value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /><span className="mt-1 block text-right text-xs font-bold text-slate-800">{formatMMK(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</span></label>
-                  <button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} aria-label={`Remove ${item.title || "quotation item"}`} className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"><Trash2 size={16} /></button>
-                </div>
-              ))}</div>}
+              <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold text-slate-900">Quotation စာရင်း <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">{items.length}</span></h2><p className="mt-1 text-xs text-slate-500">Excel ထဲက Item, Model, Qty, Price, Total Amount အစီအစဉ်အတိုင်း ဖြည့်ပါ။</p></div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-600"><tr><th className="px-3 py-3">Sr</th><th className="px-3 py-3">Item</th><th className="px-3 py-3">Model</th><th className="w-24 px-3 py-3">Qty</th><th className="w-40 px-3 py-3">Price (MMK)</th><th className="w-40 px-3 py-3 text-right">Total Amount</th><th className="w-52 px-3 py-3">Product Photo / Spec</th><th className="w-12 px-2 py-3" /></tr></thead>
+                  <tbody>{items.map((item, index) => (
+                    <tr key={item.id} className="border-t border-slate-200 align-top">
+                      <td className="px-3 py-3 font-semibold text-slate-500">{index + 1}</td>
+                      <td className="min-w-52 px-3 py-3"><input value={item.title} onChange={(event) => updateItem(item.id, { title: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 px-3 font-semibold" placeholder="Item name" /><span className="mt-1 block text-[11px] text-emerald-700">{item.categoryTitle}</span></td>
+                      <td className="min-w-48 px-3 py-3"><input value={item.model} onChange={(event) => updateItem(item.id, { model: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 px-3" placeholder="Model / specification" /><input value={item.warrantyTerm} onChange={(event) => updateItem(item.id, { warrantyTerm: event.target.value })} className="mt-2 h-9 w-full rounded-lg border border-slate-200 px-3 text-xs" placeholder="Warranty (optional)" /></td>
+                      <td className="px-3 py-3"><input type="number" min="0" step="any" value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 px-2" /><input value={item.unit} onChange={(event) => updateItem(item.id, { unit: event.target.value })} className="mt-2 h-8 w-full rounded-lg border border-slate-200 px-2 text-xs" aria-label="Unit" placeholder="Unit" /></td>
+                      <td className="px-3 py-3"><input type="number" min="0" value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 px-2 text-right" placeholder="0" /></td>
+                      <td className="px-3 py-3 text-right font-bold">{formatMMK(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</td>
+                      <td className="px-3 py-3"><div className="flex items-center gap-2">{item.mainImage && <Image src={item.mainImage} alt="" width={44} height={44} unoptimized className="h-11 w-11 shrink-0 rounded border border-slate-200 bg-white object-contain" />}<label className="cursor-pointer rounded-lg border border-slate-300 px-2 py-2 text-xs font-semibold hover:bg-slate-50">{item.mainImage ? "Photo ပြောင်း" : "Photo ထည့်"}<input type="file" accept="image/*" className="sr-only" onChange={(event) => uploadItemImage(item.id, "mainImage", event.target.files?.[0])} /></label></div><label className="mt-2 block cursor-pointer text-xs font-medium text-blue-700 hover:underline">Spec sheet ထည့် / ပြောင်း<input type="file" accept="image/*" className="sr-only" onChange={(event) => uploadItemImage(item.id, "specificationImage", event.target.files?.[0])} /></label>{item.specificationImage && <span className="mt-1 block text-[10px] text-emerald-700">Spec sheet အဆင်သင့်</span>}</td>
+                      <td className="px-2 py-3"><button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} aria-label={`Remove ${item.title || "quotation item"}`} className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"><Trash2 size={16} /></button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              {imageError && <p className="mx-5 mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{imageError}</p>}
+              <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 p-4">
+                <select value={selectedPreset} onChange={(event) => setSelectedPreset(event.target.value)} className="h-10 min-w-64 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Excel မှ ကြိုး / breaker / ပစ္စည်းရွေးရန်</option>{BOM_PRESETS.map((preset, index) => <option key={preset.title} value={index}>{preset.title}</option>)}</select>
+                <button type="button" onClick={addPresetItem} disabled={selectedPreset === ""} className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"><Plus size={16} /> ရွေးထားတာ Add</button>
+                <button type="button" onClick={addCustomItem} className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800"><Plus size={16} /> အသစ်ထည့်ရန်</button>
+              </div>
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
@@ -318,14 +387,22 @@ export default function QuotationPage() {
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm sm:p-7"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-slate-900">Quotation total</h2><span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">A4 proposal</span></div><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-slate-600">Net total</span><strong>{formatMMK(netTotal)}</strong></div><label className="flex items-center justify-between gap-4"><span className="text-slate-600">Discount (MMK)</span><input type="number" min="0" value={discount} onChange={(event) => setDiscount(event.target.value)} className="h-9 w-36 rounded-lg border border-emerald-200 bg-white px-3 text-right" /></label><div className="flex justify-between border-t border-emerald-200 pt-3 text-base"><strong>Total amount</strong><strong className="text-emerald-800">{formatMMK(totalAmount)}</strong></div><div className="flex justify-between"><span className="text-slate-600">30% deposit</span><strong>{formatMMK(depositAmount)}</strong></div><div className="flex justify-between"><span className="text-slate-600">Balance after handover</span><strong>{formatMMK(balanceAmount)}</strong></div></div><p className="mt-4 text-xs leading-5 text-slate-500">Deposit percentage follows the current quotation reference and is calculated automatically.</p></div>
             </div>
 
+            <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <summary className="cursor-pointer font-bold text-slate-900">နောက်ဆုံးစာမျက်နှာက Warranty / Service စာသား ပြင်ရန်</summary>
+              <p className="mt-2 text-sm text-slate-500">ပုံမှန်စည်းကမ်းချက်တွေကို အလိုအလျောက်ထည့်ထားပါတယ်။ ဒီ quotation အတွက် ပြင်ရန်လိုမှသာ ဖွင့်ပြီး ပြင်ပါ။</p>
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">{warrantyParagraphs.map((paragraph, index) => <label key={index} className="text-sm font-semibold text-slate-700">{["Inverter နှင့် Circuit Protection", "Lithium Battery", "Installation နှင့် After-Sales Service"][index]}<textarea value={paragraph} onChange={(event) => updateWarrantyParagraph(index, event.target.value)} rows={6} className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-sm font-normal leading-6" /></label>)}</div>
+            </details>
+
           </section>
         </div>
 
-        <div className="hidden print:block">
+        <div className="mt-10 block">
+          <h2 className="mx-auto mb-4 max-w-[210mm] text-xl font-black text-slate-900 print:hidden">Quotation စာမျက်နှာများ အကြိုကြည့်ရန်</h2>
+          <div className="space-y-6 print:space-y-0">
           {quoteItemPages.map((pageItems, pageIndex) => {
             const isFirstPage = pageIndex === 0;
             const isLastPage = pageIndex === quoteItemPages.length - 1;
-            return <article key={`quote-page-${pageIndex}`} className="quote-print-page quote-page-break">
+            return <article key={`quote-page-${pageIndex}`} className="quote-print-page quote-page-break mx-auto my-5 min-h-[297mm] w-full max-w-[210mm] border border-slate-200 bg-white p-[10mm] shadow-sm print:my-0 print:border-0 print:shadow-none">
               <Letterhead />
               {isFirstPage ? <>
                 <div className="mt-5 flex items-start justify-between gap-6"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Solar Energy Proposal</p><h1 className="mt-1 text-3xl font-black text-slate-900">Quotation</h1><p className="mt-2 text-lg font-semibold text-slate-800">{projectTitle || "Solar Hybrid System Installation"}</p></div><div className="rounded-xl bg-slate-50 p-4 text-right text-sm"><p><span className="text-slate-500">Quotation No.</span> <strong>{quotationNo}</strong></p><p className="mt-1"><span className="text-slate-500">Date</span> <strong>{dateLabel}</strong></p><p className="mt-1"><span className="text-slate-500">Valid</span> <strong>{validDays} days</strong></p></div></div>
@@ -340,17 +417,17 @@ export default function QuotationPage() {
             </article>;
           })}
 
-          <article className="quote-print-page quote-page-break">
+          <article className="quote-print-page quote-page-break mx-auto my-5 min-h-[297mm] w-full max-w-[210mm] border border-slate-200 bg-white p-[10mm] shadow-sm print:my-0 print:border-0 print:shadow-none">
             <Letterhead small />
             <div className="mt-8 text-center"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">System Overview</p><h2 className="mt-2 text-3xl font-black text-slate-900">One-Line Diagram</h2><p className="mt-2 text-sm text-slate-500">{projectTitle || "Solar Hybrid System Installation"}</p></div>
             <div className="mt-8"><OneLineDiagram systemTitle={projectTitle} /></div>
             <div className="quote-no-break mt-8 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm leading-6"><strong className="text-emerald-900">Designed for your project</strong><p className="mt-1 text-slate-700">The selected inverter, battery, solar and circuit protection products are shown in the following specification pages. Final system design is confirmed against site conditions and approved equipment.</p></div>
           </article>
 
-          {items.filter((item) => item.productId).map((item) => (
-            <article key={item.id} className="quote-print-page quote-page-break">
+          {items.filter((item) => item.productId || item.mainImage || item.specificationImage).map((item) => (
+            <article key={item.id} className="quote-print-page quote-page-break mx-auto my-5 min-h-[297mm] w-full max-w-[210mm] border border-slate-200 bg-white p-[10mm] shadow-sm print:my-0 print:border-0 print:shadow-none">
               <Letterhead small />
-              <div className="mt-8"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Product Specification</p><h2 className="mt-2 text-2xl font-black text-slate-900">{item.title}</h2><p className="mt-1 text-sm text-slate-500">{item.categoryTitle}{item.model ? ` · ${item.model}` : ""}</p>{item.warrantyTerm && <p className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">Warranty: {item.warrantyTerm}</p>}</div>
+              <div className="mt-8"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Product Specification</p><h2 className="mt-2 text-2xl font-black text-slate-900">{item.model || item.title}</h2><p className="mt-1 text-sm text-slate-500">{item.categoryTitle}{item.title && item.model ? ` · ${item.title}` : ""}</p>{item.warrantyTerm && <p className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">Warranty: {item.warrantyTerm}</p>}</div>
               {item.description && <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{item.description}</p>}
               {item.mainImage && <div className="mt-6 grid min-h-40 place-items-center rounded-2xl border border-slate-200 bg-white p-5"><Image src={item.mainImage} alt={item.title} width={800} height={600} unoptimized className="max-h-[55mm] max-w-full object-contain" /></div>}
               {item.specificationImage && <div className="mt-5 grid min-h-48 place-items-center rounded-2xl border border-slate-200 bg-white p-4"><Image src={item.specificationImage} alt={`${item.title} specification`} width={1200} height={1600} unoptimized className="max-h-[105mm] max-w-full object-contain" /></div>}
@@ -359,13 +436,14 @@ export default function QuotationPage() {
             </article>
           ))}
 
-          <article className="quote-print-page">
+          <article className="quote-print-page mx-auto my-5 min-h-[297mm] w-full max-w-[210mm] border border-slate-200 bg-white p-[10mm] shadow-sm print:my-0 print:border-0 print:shadow-none">
             <Letterhead small />
             <div className="mt-7"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Customer Care</p><h2 className="mt-2 text-3xl font-black text-slate-900">Warranty & After-Sales Service</h2><p className="mt-2 text-sm leading-6 text-slate-600">ယုံကြည်စိတ်ချစွာ အသုံးပြုနိုင်ရန် စနစ်တကျ အာမခံဝန်ဆောင်မှုနှင့် နည်းပညာအကူအညီများ ပေးအပ်ပါသည်။ အောက်ပါအချက်များသည် ရွေးချယ်ထားသော ပစ္စည်း Model နှင့် ထုတ်လုပ်သူ၏ အာမခံမူဝါဒအလိုက် အကျုံးဝင်ပါသည်။</p></div>
-            <div className="mt-6 space-y-4">{DEFAULT_WARRANTY_PARAGRAPHS.map((paragraph, index) => <section key={index} className="quote-no-break rounded-2xl border border-slate-200 bg-white p-5"><div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-700 text-sm font-black text-white">0{index + 1}</span><h3 className="text-base font-black text-slate-900">{["Inverter နှင့် Circuit Protection", "Lithium Battery အာမခံ", "Installation နှင့် After-Sales Service"][index]}</h3></div><p className="whitespace-pre-line text-[12px] leading-7 text-slate-700">{paragraph}</p></section>)}</div>
+            <div className="mt-6 space-y-4">{warrantyParagraphs.map((paragraph, index) => <section key={index} className="quote-no-break rounded-2xl border border-slate-200 bg-white p-5"><div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-700 text-sm font-black text-white">0{index + 1}</span><h3 className="text-base font-black text-slate-900">{["Inverter နှင့် Circuit Protection", "Lithium Battery အာမခံ", "Installation နှင့် After-Sales Service"][index]}</h3></div><p className="whitespace-pre-line text-[12px] leading-7 text-slate-700">{paragraph}</p></section>)}</div>
             <div className="quote-no-break mt-6 rounded-2xl bg-slate-50 p-5"><h3 className="font-bold text-slate-900">အာမခံဝန်ဆောင်မှု ရယူရန်</h3><p className="mt-2 text-sm leading-6 text-slate-700">Warranty claim တင်ရာတွင် ဝယ်ယူကြောင်းအထောက်အထား၊ Product Serial Number နှင့် Warranty Registration အချက်အလက်များကို ပြသပေးပါ။ စစ်ဆေးအတည်ပြုပြီးနောက် သက်ဆိုင်ရာ Warranty Policy အတိုင်း ဝန်ဆောင်မှုပေးပါမည်။</p></div>
             <div className="mt-10 grid grid-cols-2 gap-16 text-center text-xs"><div className="border-t border-slate-400 pt-2">MTK Solar Energy Group</div><div className="border-t border-slate-400 pt-2">Customer acceptance</div></div>
           </article>
+          </div>
         </div>
       </main>
       <style jsx global>{`
@@ -380,6 +458,7 @@ export default function QuotationPage() {
           .quote-items tr { break-inside: avoid; page-break-inside: avoid; }
           .quote-letterhead img { print-color-adjust: exact; }
         }
+        .quote-print-page { box-sizing: border-box; }
       `}</style>
     </DashboardShell>
   );
