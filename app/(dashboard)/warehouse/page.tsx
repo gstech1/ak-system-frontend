@@ -27,6 +27,7 @@ type ActionItem = {
   description: string;
   icon: typeof PackageSearch;
   href: string;
+  disabled?: boolean;
 };
 
 type MtkSummary = {
@@ -137,6 +138,12 @@ export default function WarehousePage() {
       icon: RotateCcw,
       href: "/warehouse/service-return",
     },
+    {
+      title: "Quotation",
+      description: "Build and print customer quotations",
+      icon: FileText,
+      href: "/warehouse/quotation",
+    },
     
   ];
 
@@ -206,8 +213,12 @@ export default function WarehousePage() {
       <button
         key={action.title}
         type="button"
-        onClick={() => goTo(action.href)}
-        className="group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+        onClick={() => {
+          if (!action.disabled) goTo(action.href);
+        }}
+        disabled={action.disabled}
+        aria-label={action.disabled ? `${action.title}, coming soon` : action.title}
+        className={`group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 ${action.disabled ? "cursor-not-allowed opacity-70" : "hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"}`}
       >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition duration-200 group-hover:bg-emerald-600 group-hover:text-white">
@@ -227,9 +238,15 @@ export default function WarehousePage() {
             </p>
           </div>
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition group-hover:bg-emerald-50 group-hover:text-emerald-600">
-            <ArrowRight size={15} />
-          </div>
+          {action.disabled ? (
+            <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+              Soon
+            </span>
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 transition group-hover:bg-emerald-50 group-hover:text-emerald-600">
+              <ArrowRight size={15} />
+            </div>
+          )}
         </div>
       </button>
     );
@@ -270,16 +287,11 @@ export default function WarehousePage() {
         </header>
 
         <section className="mb-8">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">MTK Stock Overview</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {summary?.warehouse ? `${summary.warehouse} · MTK warehouse data` : "Live stock and movement totals"}
-              </p>
-            </div>
-            <button type="button" onClick={() => goTo("/warehouse/reports")} className="text-sm font-bold text-emerald-700 hover:text-emerald-800">
-              View reports →
-            </button>
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-slate-900">MTK Stock Overview</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {summary?.warehouse ? `${summary.warehouse} · MTK warehouse data` : "Live stock and movement totals"}
+            </p>
           </div>
           {summaryError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{summaryError}</div>
@@ -288,16 +300,18 @@ export default function WarehousePage() {
           ) : !summary.warehouse ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">MTK-MAIN warehouse is not configured. Ask an administrator to check the warehouse setup.</div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                ["Current Stock", summary.stock.quantity, "units in warehouse"],
-                ["Stock IN", summary.stockIn.quantity, `${summary.stockIn.transactions} receipts`],
-                ["Sales OUT", summary.salesOut.quantity, `${summary.salesOut.transactions} completed issues`],
-                ["Service Outstanding", summary.serviceIssue.outstandingQuantity, `${summary.serviceIssue.transactions} service issues`],
+                ["Registered Products", summary.products.total, "active products in the product list"],
+                ["Current Stock", summary.stock.quantity, "units currently in the warehouse"],
+                ["Stock IN", summary.stockIn.quantity, `${summary.stockIn.transactions} completed receipts`],
+                ["Sales OUT", summary.salesOut.quantity, `${summary.salesOut.transactions} completed sales issues`],
+                ["Service Outstanding", summary.serviceIssue.outstandingQuantity, `${summary.serviceIssue.transactions} completed service issues`],
+                ["Service Returns", summary.serviceReturn.returnedQuantity, `${summary.serviceReturn.records} records · ${summary.serviceReturn.usedQuantity.toLocaleString()} units used`],
               ].map(([label, amount, detail]) => (
                 <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <p className="text-sm font-semibold text-slate-500">{label}</p>
-                  <p className="mt-2 text-3xl font-black text-slate-900">{amount}</p>
+                  <p className="mt-2 text-3xl font-black text-slate-900">{Number(amount).toLocaleString()}</p>
                   <p className="mt-1 text-xs text-slate-400">{detail}</p>
                 </div>
               ))}
