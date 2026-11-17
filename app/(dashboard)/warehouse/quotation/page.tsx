@@ -5,8 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import DashboardShell from "@/components/layout/DashboardShell";
 import { useDashboardLanguage } from "@/components/layout/DashboardLanguageProvider";
-import { getQuotation, getQuotations, getWebsiteCmsImageUrl, getWebsiteProductCategories, saveQuotation, uploadQuotationImage, type QuotationListItem, type QuotationRecord, type SaveQuotationPayload } from "@/lib/website-cms-api";
-import { ArrowLeft, FileText, Plus, Printer, Trash2 } from "lucide-react";
+import { deleteQuotationCatalogItem, getQuotation, getQuotationCatalogItems, getQuotations, getWebsiteCmsImageUrl, getWebsiteProductCategories, saveQuotation, saveQuotationCatalogItem, uploadQuotationImage, type QuotationCatalogItem, type QuotationListItem, type QuotationRecord, type SaveQuotationCatalogItemPayload, type SaveQuotationPayload } from "@/lib/website-cms-api";
+import { ArrowLeft, FileText, Pencil, Plus, Printer, Save, Trash2, X } from "lucide-react";
 
 type WebsiteProduct = {
   id: string;
@@ -30,6 +30,9 @@ type WebsiteCategory = {
 type QuotationProduct = WebsiteProduct & {
   categoryTitle: string;
   categoryGroup: string;
+  catalogModel?: string;
+  catalogItemId?: string;
+  isCustom?: boolean;
 };
 
 type QuoteItem = {
@@ -141,7 +144,7 @@ function Letterhead({ small = false, companyTitle, companyAddress, companyPhone,
 
 function OneLineDiagram() {
   return (
-    <div className="quote-diagram-crop relative mx-auto aspect-[0.94/1] w-full max-w-[165mm] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="quote-diagram-crop relative mx-auto aspect-[0.916/1] w-full max-w-[165mm] overflow-hidden bg-white">
       <Image
         src="/images/quotation/solar-hybrid-one-line.png"
         alt="Solar hybrid system one-line diagram"
@@ -149,7 +152,7 @@ function OneLineDiagram() {
         priority
         unoptimized
         sizes="(max-width: 768px) 100vw, 620px"
-        className="object-cover object-[center_48%]"
+        className="object-contain"
       />
     </div>
   );
@@ -159,8 +162,22 @@ export default function QuotationPage() {
   const { language } = useDashboardLanguage();
   const [quoteDefaults] = useState(createQuoteDefaults);
   const [categories, setCategories] = useState<WebsiteCategory[]>([]);
+  const [savedCatalogItems, setSavedCatalogItems] = useState<QuotationCatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
+  const [catalogEditorOpen, setCatalogEditorOpen] = useState(false);
+  const [catalogManagementError, setCatalogManagementError] = useState("");
+  const [catalogManagementMessage, setCatalogManagementMessage] = useState("");
+  const [catalogSavingId, setCatalogSavingId] = useState("");
+  const [catalogDrafts, setCatalogDrafts] = useState<Record<string, { title: string; model: string }>>({});
+  const [canManageCatalog, setCanManageCatalog] = useState(false);
+  const [newCatalogGroup, setNewCatalogGroup] = useState<"inverter" | "battery">("inverter");
+  const [newCatalogTitle, setNewCatalogTitle] = useState("");
+  const [newCatalogModel, setNewCatalogModel] = useState("");
+  const [newCatalogMainImage, setNewCatalogMainImage] = useState("");
+  const [newCatalogSpecificationImage, setNewCatalogSpecificationImage] = useState("");
+  const [warrantyEditorOpen, setWarrantyEditorOpen] = useState(false);
+  const [letterheadEditorOpen, setLetterheadEditorOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -194,6 +211,7 @@ export default function QuotationPage() {
   const [bankInformation, setBankInformation] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("တပ်ဆင်ရန် အတည်ပြုပြီးပါက စရံငွေ 30% ပေးချေရမည်ဖြစ်ပြီး Site အပ်နှံပြီးချိန်တွင် ကျန်ငွေအားလုံး ပေးချေရပါမည်။");
   const [priceNote, setPriceNote] = useState("ဈေးနှုန်းများသည် ဈေးကွက်အပြောင်းအလဲအရ ပြောင်းလဲနိုင်ပါသည်။");
+  const [diagramNotes, setDiagramNotes] = useState("");
   const [warrantyParagraphs, setWarrantyParagraphs] = useState<string[]>(DEFAULT_WARRANTY_PARAGRAPHS);
 
   useEffect(() => {
@@ -208,6 +226,21 @@ export default function QuotationPage() {
       .finally(() => {
         if (!cancelled) setCatalogLoading(false);
       });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("authUser") || "null");
+      setCanManageCatalog(["ADMIN", "BOSS", "MANAGER"].includes(String(currentUser?.role || "").toUpperCase()));
+    } catch {
+      setCanManageCatalog(false);
+    }
+
+    let cancelled = false;
+    getQuotationCatalogItems()
+      .then((items) => { if (!cancelled) setSavedCatalogItems(Array.isArray(items) ? items : []); })
+      .catch((error: unknown) => { if (!cancelled) setCatalogManagementError(error instanceof Error ? error.message : "Product names could not be loaded."); });
     return () => { cancelled = true; };
   }, []);
 
@@ -237,14 +270,51 @@ export default function QuotationPage() {
   }, [historySearch, historyPage, historyVersion]);
 
   const catalogProducts = useMemo<QuotationProduct[]>(() => {
-    return categories.flatMap((category) => {
+    const websiteProducts = categories.flatMap((category) => {
       const categoryGroup = getProductGroup(category);
       if (!categoryGroup || category.isPublished === false) return [];
       return (category.products || [])
         .filter((product) => product.isPublished !== false)
-        .map((product) => ({ ...product, categoryTitle: category.title, categoryGroup }));
+        .map((product) => {
+          const saved = savedCatalogItems.find((item) => item.sourceProductId === product.id);
+          return {
+            ...product,
+            title: saved?.title || product.title,
+            description: saved?.description ?? product.description,
+            mainImage: saved?.mainImage || product.mainImage || product.images?.[0]?.imageUrl || null,
+            specificationImage: saved?.specificationImage || product.specificationImage || product.images?.[1]?.imageUrl || null,
+            categoryTitle: category.title,
+            categoryGroup,
+            catalogModel: saved?.model || "",
+            catalogItemId: saved?.id,
+            isCustom: false,
+          };
+        });
     });
-  }, [categories]);
+    const customProducts: QuotationProduct[] = savedCatalogItems
+      .filter((item) => item.isCustom)
+      .map((item) => ({
+        id: item.id,
+        slug: item.id,
+        title: item.title,
+        description: item.description,
+        mainImage: item.mainImage,
+        specificationImage: item.specificationImage,
+        categoryTitle: item.group === "inverter" ? "Inverter" : "Battery System",
+        categoryGroup: item.group,
+        catalogModel: item.model || "",
+        catalogItemId: item.id,
+        isCustom: true,
+      }));
+    return [...websiteProducts, ...customProducts];
+  }, [categories, savedCatalogItems]);
+
+  useEffect(() => {
+    setCatalogDrafts(Object.fromEntries(catalogProducts.map((product) => [
+      product.id,
+      { title: product.title, model: product.catalogModel || "" },
+    ])));
+  }, [catalogProducts]);
 
   const netTotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const discountAmount = Math.min(netTotal, Math.max(0, Number(discount) || 0));
@@ -275,7 +345,7 @@ export default function QuotationPage() {
         productId: selectedProduct.id,
         categoryTitle: selectedProduct.categoryTitle,
         title: selectedProduct.categoryTitle,
-        model: selectedProduct.title,
+        model: selectedProduct.catalogModel || selectedProduct.title,
         description: selectedProduct.description || "",
         mainImage: selectedProduct.mainImage ? getWebsiteCmsImageUrl(selectedProduct.mainImage) : "",
         specificationImage: selectedProduct.specificationImage ? getWebsiteCmsImageUrl(selectedProduct.specificationImage) : "",
@@ -327,6 +397,102 @@ export default function QuotationPage() {
     setWarrantyParagraphs((current) => current.map((paragraph, itemIndex) => itemIndex === index ? value : paragraph));
   }
 
+  async function saveManagedCatalogProduct(product: QuotationProduct) {
+    const draft = catalogDrafts[product.id] || { title: product.title, model: product.catalogModel || "" };
+    if (!draft.title.trim()) {
+      setCatalogManagementError("ထုတ်ကုန်အမည် ဖြည့်ပါ။");
+      return;
+    }
+    setCatalogSavingId(product.id);
+    setCatalogManagementError("");
+    setCatalogManagementMessage("");
+    try {
+      const saved = await saveQuotationCatalogItem({
+        id: product.catalogItemId,
+        group: product.categoryGroup as "inverter" | "battery",
+        title: draft.title.trim(),
+        model: draft.model.trim() || undefined,
+        description: product.description || undefined,
+        mainImage: product.mainImage || undefined,
+        specificationImage: product.specificationImage || undefined,
+        sourceProductId: product.isCustom ? undefined : product.id,
+      });
+      setSavedCatalogItems((current) => current.some((item) => item.id === saved.id)
+        ? current.map((item) => item.id === saved.id ? saved : item)
+        : [...current, saved]);
+      setCatalogManagementMessage(`${saved.title} သိမ်းပြီးပါပြီ။`);
+    } catch (error) {
+      setCatalogManagementError(error instanceof Error ? error.message : "ထုတ်ကုန်အမည် သိမ်းမရပါ။");
+    } finally {
+      setCatalogSavingId("");
+    }
+  }
+
+  async function removeManagedCatalogProduct(product: QuotationProduct) {
+    if (!product.catalogItemId) return;
+    setCatalogSavingId(product.id);
+    setCatalogManagementError("");
+    setCatalogManagementMessage("");
+    try {
+      await deleteQuotationCatalogItem(product.catalogItemId);
+      setSavedCatalogItems((current) => current.filter((item) => item.id !== product.catalogItemId));
+      setCatalogManagementMessage(product.isCustom ? "ထုတ်ကုန်စာရင်းမှ ဖယ်ရှားပြီးပါပြီ။" : "မူရင်းအမည်သို့ ပြန်ထားပြီးပါပြီ။");
+    } catch (error) {
+      setCatalogManagementError(error instanceof Error ? error.message : "ထုတ်ကုန်ကို ဖယ်ရှားမရပါ။");
+    } finally {
+      setCatalogSavingId("");
+    }
+  }
+
+  async function uploadNewCatalogImage(field: "mainImage" | "specificationImage", file?: File) {
+    if (!file) return;
+    setCatalogManagementError("");
+    if (file.size > 5 * 1024 * 1024) {
+      setCatalogManagementError("ပုံဖိုင်တစ်ပုံလျှင် 5 MB ထက်မကျော်စေရပါ။");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const result = await uploadQuotationImage(file);
+      if (field === "mainImage") setNewCatalogMainImage(result.path);
+      else setNewCatalogSpecificationImage(result.path);
+    } catch (error) {
+      setCatalogManagementError(error instanceof Error ? error.message : "ပုံဖိုင်တင်မရပါ။");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function addManagedCatalogProduct() {
+    if (!newCatalogTitle.trim()) {
+      setCatalogManagementError("ထုတ်ကုန်အမည် ဖြည့်ပါ။");
+      return;
+    }
+    setCatalogSavingId("new");
+    setCatalogManagementError("");
+    setCatalogManagementMessage("");
+    try {
+      const saved = await saveQuotationCatalogItem({
+        group: newCatalogGroup,
+        title: newCatalogTitle.trim(),
+        model: newCatalogModel.trim() || undefined,
+        mainImage: newCatalogMainImage || undefined,
+        specificationImage: newCatalogSpecificationImage || undefined,
+      });
+      setSavedCatalogItems((current) => [...current, saved]);
+      setSelectedProductIds((current) => ({ ...current, [saved.group]: saved.id }));
+      setNewCatalogTitle("");
+      setNewCatalogModel("");
+      setNewCatalogMainImage("");
+      setNewCatalogSpecificationImage("");
+      setCatalogManagementMessage(`${saved.title} ထည့်ပြီးပါပြီ။`);
+    } catch (error) {
+      setCatalogManagementError(error instanceof Error ? error.message : "ထုတ်ကုန်အသစ် ထည့်မရပါ။");
+    } finally {
+      setCatalogSavingId("");
+    }
+  }
+
   function applyQuotationRecord(record: QuotationRecord) {
     const data = record.data;
     const text = (key: string, fallback = "") => typeof data[key] === "string" ? data[key] as string : fallback;
@@ -348,6 +514,7 @@ export default function QuotationPage() {
     setBankInformation(text("bankInformation"));
     setPaymentTerms(text("paymentTerms"));
     setPriceNote(text("priceNote"));
+    setDiagramNotes(text("diagramNotes"));
     setWarrantyParagraphs(Array.isArray(data.warrantyParagraphs) && data.warrantyParagraphs.length === 3
       ? data.warrantyParagraphs.map((paragraph) => typeof paragraph === "string" ? paragraph : "")
       : DEFAULT_WARRANTY_PARAGRAPHS);
@@ -386,7 +553,7 @@ export default function QuotationPage() {
       data: {
         quotationNo: quotationNo.trim(), quoteDate, customerName, customerId, phone, address,
         companyTitle, companyAddress, companyPhone, servicePhone, projectTitle, projectSupervisor,
-        validDays, discount, bankInformation, paymentTerms, priceNote, warrantyParagraphs, items,
+        validDays, discount, bankInformation, paymentTerms, priceNote, diagramNotes, warrantyParagraphs, items,
       },
     };
     try {
@@ -423,6 +590,7 @@ export default function QuotationPage() {
     setValidDays("7"); setDiscount("0"); setBankInformation("");
     setPaymentTerms("တပ်ဆင်ရန် အတည်ပြုပြီးပါက စရံငွေ 30% ပေးချေရမည်ဖြစ်ပြီး Site အပ်နှံပြီးချိန်တွင် ကျန်ငွေအားလုံး ပေးချေရပါမည်။");
     setPriceNote("ဈေးနှုန်းများသည် ဈေးကွက်အပြောင်းအလဲအရ ပြောင်းလဲနိုင်ပါသည်။");
+    setDiagramNotes("");
     setWarrantyParagraphs(DEFAULT_WARRANTY_PARAGRAPHS);
     setItems([]); setQuotationActionError(""); setQuotationActionMessage("");
   }
@@ -464,12 +632,9 @@ export default function QuotationPage() {
                 <label className="text-sm font-semibold text-slate-700">Customer ID<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" placeholder="Optional" /></label>
                 <label className="text-sm font-semibold text-slate-700">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" placeholder="Customer phone" /></label>
                 <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" placeholder="Project / customer address" /></label>
-                <label className="text-sm font-semibold text-slate-700 sm:col-span-2">{language === "my" ? "ကုမ္ပဏီခေါင်းစဉ်" : "Company heading"}<input value={companyTitle} onChange={(event) => setCompanyTitle(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
-                <label className="text-sm font-semibold text-slate-700 sm:col-span-2">{language === "my" ? "ကုမ္ပဏီလိပ်စာ" : "Company address"}<input value={companyAddress} onChange={(event) => setCompanyAddress(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
-                <label className="text-sm font-semibold text-slate-700">{language === "my" ? "ကုမ္ပဏီဖုန်း" : "Company phones"}<input value={companyPhone} onChange={(event) => setCompanyPhone(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
-                <label className="text-sm font-semibold text-slate-700">{language === "my" ? "Customer Service ဖုန်း" : "Customer service phone"}<input value={servicePhone} onChange={(event) => setServicePhone(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
+                <div className="flex items-end"><button type="button" onClick={() => setLetterheadEditorOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Pencil size={15} /> {language === "my" ? "Letterhead ပြင်ရန်" : "Edit letterhead"}</button></div>
                 <label className="text-sm font-semibold text-slate-700">Project title<input value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
-                <label className="text-sm font-semibold text-slate-700">Quotation no.<input value={quotationNo} disabled={persistedQuotationNo === quotationNo} onChange={(event) => setQuotationNo(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal disabled:bg-slate-100" /></label>
+                <label className="text-sm font-semibold text-slate-700">Quotation ID (အလိုအလျောက်)<input value={quotationNo} readOnly className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 font-normal text-slate-700" /></label>
                 <label className="text-sm font-semibold text-slate-700">Date<input type="date" value={quoteDate} onChange={(event) => setQuoteDate(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
                 <label className="text-sm font-semibold text-slate-700">Project supervisor<input value={projectSupervisor} onChange={(event) => setProjectSupervisor(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" placeholder="Supervisor name" /></label>
                 <label className="text-sm font-semibold text-slate-700">Price validity (days)<input type="number" min="1" value={validDays} onChange={(event) => setValidDays(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
@@ -477,22 +642,53 @@ export default function QuotationPage() {
             </div>
 
             <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-7">
-              <div className="mb-5"><h2 className="font-bold text-slate-900">အဓိကပစ္စည်း မော်ဒယ်ရွေးရန်</h2><p className="text-sm text-slate-500">Website catalog ထဲက Inverter, Battery နဲ့ Solar မော်ဒယ်တွေကို ကြိုတင်ယူထားပါတယ်။ ရွေးပြီး Add နှိပ်တာနဲ့ Excel ပုံစံစာရင်းထဲ ဝင်ပါမယ်။</p></div>
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-bold text-slate-900">အဓိကပစ္စည်း မော်ဒယ်ရွေးရန်</h2><p className="text-sm text-slate-500">Inverter နဲ့ Battery ကိုရွေးပြီး Add လုပ်ပါ။ Product ပုံနဲ့ Spec ပုံပါသော စာမျက်နှာတစ်မျက်နှာစီ ထည့်ပေးပါမယ်။</p></div>{canManageCatalog && <button type="button" onClick={() => { setCatalogEditorOpen((open) => !open); setCatalogManagementError(""); }} className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Pencil size={15} /> ထုတ်ကုန်အမည် ပြင် / အသစ်ထည့်</button>}</div>
               {catalogError && <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Website product စာရင်း မရသေးပါ။ ခဏနေရင် Refresh လုပ်ပါ၊ သို့မဟုတ် အောက်က Add item မှာ ကိုယ်တိုင်ဖြည့်ပါ။ ({catalogError})</p>}
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 lg:grid-cols-2">
                 {PRODUCT_GROUPS.map((group) => {
                   const products = catalogProducts.filter((product) => product.categoryGroup === group.value);
                   return <div key={group.value} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <label className="block text-sm font-bold text-slate-700">{group.label}
                       <select value={selectedProductIds[group.value] || ""} onChange={(event) => setSelectedProductIds((current) => ({ ...current, [group.value]: event.target.value }))} disabled={catalogLoading || products.length === 0} className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100">
-                        <option value="">{catalogLoading ? "Loading models…" : products.length ? "Model ရွေးပါ" : "Website catalog မှာ မရှိသေးပါ"}</option>
-                        {products.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}
+                        <option value="">{catalogLoading ? "ပစ္စည်းစာရင်းဖွင့်နေသည်…" : products.length ? "ပစ္စည်းအမည်ရွေးပါ" : "ပစ္စည်းမရှိသေးပါ"}</option>
+                        {products.map((product) => <option key={product.id} value={product.id}>{product.title}{product.catalogModel ? ` — ${product.catalogModel}` : ""}</option>)}
                       </select>
                     </label>
                     <button type="button" onClick={() => addCatalogProduct(group.value)} disabled={!selectedProductIds[group.value]} className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={16} /> Add to quotation</button>
                   </div>;
                 })}
               </div>
+              {canManageCatalog && catalogEditorOpen && <div className="mt-5 space-y-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Inverter / Battery အမည်စာရင်း</h3><p className="mt-1 text-xs text-slate-600">ဒီနေရာမှာ ပြင်/ထည့်ထားတဲ့အမည်တွေကို အသုံးပြုသူအားလုံး မြင်ရပါမယ်။</p></div><button type="button" onClick={() => setCatalogEditorOpen(false)} aria-label="Close product editor" className="rounded-lg p-2 text-slate-500 hover:bg-white"><X size={18} /></button></div>
+                {catalogManagementError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{catalogManagementError}</p>}
+                {catalogManagementMessage && <p className="rounded-lg border border-emerald-200 bg-white p-3 text-sm text-emerald-800">{catalogManagementMessage}</p>}
+                {catalogManagementError && catalogManagementError.toLowerCase().includes("forbidden") && <p className="text-xs text-slate-600">ထုတ်ကုန်အမည် စီမံခွင့်ကို Admin, Boss, Manager များအတွက်သာ ဖွင့်ထားပါသည်။</p>}
+                {(["inverter", "battery"] as const).map((group) => <section key={group} className="space-y-2">
+                  <h4 className="text-sm font-bold text-emerald-900">{group === "inverter" ? "Inverter" : "Battery System"}</h4>
+                  {catalogProducts.filter((product) => product.categoryGroup === group).map((product) => {
+                    const draft = catalogDrafts[product.id] || { title: product.title, model: product.catalogModel || "" };
+                    return <div key={product.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+                      <input value={draft.title} onChange={(event) => setCatalogDrafts((current) => ({ ...current, [product.id]: { ...draft, title: event.target.value } }))} className="h-10 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" aria-label={`${product.title} product name`} placeholder="ထုတ်ကုန်အမည်" />
+                      <input value={draft.model} onChange={(event) => setCatalogDrafts((current) => ({ ...current, [product.id]: { ...draft, model: event.target.value } }))} className="h-10 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" aria-label={`${product.title} model`} placeholder="Model (မဖြည့်လည်းရ)" />
+                      <button type="button" onClick={() => void saveManagedCatalogProduct(product)} disabled={catalogSavingId === product.id} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50"><Save size={15} /> သိမ်း</button>
+                      {product.catalogItemId && <button type="button" onClick={() => void removeManagedCatalogProduct(product)} disabled={catalogSavingId === product.id} aria-label="Reset or remove product" className="grid h-10 w-10 place-items-center rounded-lg border border-red-200 text-red-600 disabled:opacity-50"><Trash2 size={16} /></button>}
+                    </div>;
+                  })}
+                </section>)}
+                <section className="space-y-3 rounded-lg border border-emerald-200 bg-white p-4">
+                  <h4 className="font-bold text-slate-900">ထုတ်ကုန်အသစ်ထည့်ရန်</h4>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs font-semibold text-slate-600">ပစ္စည်းအမျိုးအစား<select value={newCatalogGroup} onChange={(event) => setNewCatalogGroup(event.target.value as "inverter" | "battery")} className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="inverter">Inverter</option><option value="battery">Battery System</option></select></label>
+                    <label className="text-xs font-semibold text-slate-600">ထုတ်ကုန်အမည်<input value={newCatalogTitle} onChange={(event) => setNewCatalogTitle(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="ဥပမာ — Felicity Solar Inverter" /></label>
+                    <label className="text-xs font-semibold text-slate-600">Model<input value={newCatalogModel} onChange={(event) => setNewCatalogModel(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" placeholder="Model / capacity (ရွေးချယ်နိုင်သည်)" /></label>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">{newCatalogMainImage ? "Product ပုံရွေးပြီး" : "Product ပုံရွေး"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void uploadNewCatalogImage("mainImage", event.target.files?.[0]); event.target.value = ""; }} /></label>
+                      <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">{newCatalogSpecificationImage ? "Spec ပုံရွေးပြီး" : "Spec ပုံရွေး"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void uploadNewCatalogImage("specificationImage", event.target.files?.[0]); event.target.value = ""; }} /></label>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => void addManagedCatalogProduct()} disabled={catalogSavingId === "new" || uploadingImage} className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50"><Plus size={16} /> အသစ်ထည့်</button>
+                </section>
+              </div>}
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -527,13 +723,6 @@ export default function QuotationPage() {
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm sm:p-7"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-slate-900">Quotation total</h2><span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">A4 proposal</span></div><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-slate-600">Net total</span><strong>{formatMMK(netTotal)}</strong></div><label className="flex items-center justify-between gap-4"><span className="text-slate-600">Discount (MMK)</span><input type="number" min="0" value={discount} onChange={(event) => setDiscount(event.target.value)} className="h-9 w-36 rounded-lg border border-emerald-200 bg-white px-3 text-right" /></label><div className="flex justify-between border-t border-emerald-200 pt-3 text-base"><strong>Total amount</strong><strong className="text-emerald-800">{formatMMK(totalAmount)}</strong></div><div className="flex justify-between"><span className="text-slate-600">30% deposit</span><strong>{formatMMK(depositAmount)}</strong></div><div className="flex justify-between"><span className="text-slate-600">Balance after handover</span><strong>{formatMMK(balanceAmount)}</strong></div></div><p className="mt-4 text-xs leading-5 text-slate-500">Deposit percentage follows the current quotation reference and is calculated automatically.</p></div>
             </div>
 
-            <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-              <summary className="cursor-pointer font-bold text-slate-900">နောက်ဆုံးစာမျက်နှာက Warranty / Service စာသား ပြင်ရန်</summary>
-              <p className="mt-2 text-sm text-slate-500">Warranty, Payment terms နဲ့ service အချက်အလက်တွေကို ဒီနေရာမှာ ပြင်နိုင်ပါတယ်။</p>
-              <label className="mt-4 block text-sm font-semibold text-slate-700">Payment terms / ငွေပေးချေမှုစည်းကမ်း<textarea value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-sm font-normal" /></label>
-              <div className="mt-4 grid gap-4 lg:grid-cols-3">{warrantyParagraphs.map((paragraph, index) => <label key={index} className="text-sm font-semibold text-slate-700">{["Inverter နှင့် Circuit Protection", "Lithium Battery", "Installation နှင့် After-Sales Service"][index]}<textarea value={paragraph} onChange={(event) => updateWarrantyParagraph(index, event.target.value)} rows={6} className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-sm font-normal leading-6" /></label>)}</div>
-            </details>
-
           </section>
         </div>
 
@@ -547,7 +736,7 @@ export default function QuotationPage() {
               <Letterhead companyTitle={companyTitle} companyAddress={companyAddress} companyPhone={companyPhone} servicePhone={servicePhone} />
               {isFirstPage ? <>
                 <div className="mt-5 flex items-start justify-between gap-6"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Solar Energy Proposal</p><h1 className="mt-1 text-3xl font-black text-slate-900">Quotation</h1><p className="mt-2 text-lg font-semibold text-slate-800">{projectTitle || "Solar Hybrid System Installation"}</p></div><div className="rounded-xl bg-slate-50 p-4 text-right text-sm"><p><span className="text-slate-500">Quotation No.</span> <strong>{quotationNo}</strong></p><p className="mt-1"><span className="text-slate-500">Date</span> <strong>{dateLabel}</strong></p><p className="mt-1"><span className="text-slate-500">Valid</span> <strong>{validDays} days</strong></p></div></div>
-                <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-2 rounded-xl border border-slate-200 p-4 text-sm"><p><span className="text-slate-500">Customer</span><br /><strong>{customerName || "—"}</strong></p><p><span className="text-slate-500">Customer ID</span><br /><strong>{customerId || "—"}</strong></p><p><span className="text-slate-500">Phone</span><br /><strong>{phone || "—"}</strong></p><p><span className="text-slate-500">Project supervisor</span><br /><strong>{projectSupervisor || "—"}</strong></p><p className="col-span-2"><span className="text-slate-500">Address / project site</span><br /><strong>{address || "—"}</strong></p></div>
+                <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-2 rounded-xl border border-slate-200 p-4 text-xs sm:grid-cols-3"><p><span className="text-slate-500">Customer:</span> <strong>{customerName || "—"}</strong></p><p><span className="text-slate-500">Customer ID:</span> <strong>{customerId || "—"}</strong></p><p><span className="text-slate-500">Phone:</span> <strong>{phone || "—"}</strong></p><p className="sm:col-span-2"><span className="text-slate-500">Address / project site:</span> <strong>{address || "—"}</strong></p><p><span className="text-slate-500">Project supervisor:</span> <strong>{projectSupervisor || "—"}</strong></p></div>
               </> : <div className="mt-6 flex items-center justify-between border-b border-slate-200 pb-3"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Quotation continuation</p><h2 className="mt-1 text-xl font-black text-slate-900">{projectTitle || "Solar Hybrid System Installation"}</h2><p className="mt-1 text-xs text-slate-500">Customer: {customerName || "—"} · Quotation No.: {quotationNo}</p></div><p className="text-sm font-bold text-slate-500">စာမျက်နှာ {pageIndex + 1} / {quoteItemPages.length}</p></div>}
               <table className="quote-items mt-5 w-full border-collapse text-left text-[11px]"><thead className="[display:table-header-group]"><tr className="bg-slate-900 text-white"><th className="px-2 py-2">No.</th><th className="px-2 py-2">Item / model</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2">Unit</th><th className="px-2 py-2 text-right">Unit price</th><th className="px-2 py-2 text-right">Amount (MMK)</th></tr></thead><tbody>{pageItems.map((item, pageItemIndex) => { const index = pageIndex * 10 + pageItemIndex; return <tr key={item.id} className="quote-no-break border-b border-slate-200"><td className="px-2 py-2">{index + 1}</td><td className="px-2 py-2"><strong>{item.title || "Item"}</strong>{item.model && <span className="block text-slate-500">{item.model}</span>}{item.warrantyTerm && <span className="block text-emerald-700">Warranty: {item.warrantyTerm}</span>}</td><td className="px-2 py-2 text-right">{Number(item.quantity || 0).toLocaleString()}</td><td className="px-2 py-2">{item.unit}</td><td className="px-2 py-2 text-right">{Number(item.unitPrice || 0).toLocaleString()}</td><td className="px-2 py-2 text-right font-semibold">{(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toLocaleString()}</td></tr>; })}</tbody></table>
               {isLastPage && <>
@@ -562,6 +751,8 @@ export default function QuotationPage() {
             <Letterhead small companyTitle={companyTitle} companyAddress={companyAddress} companyPhone={companyPhone} servicePhone={servicePhone} />
             <div className="mt-8 text-center"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">System Overview</p><h2 className="mt-2 text-3xl font-black text-slate-900">One-Line Diagram</h2><p className="mt-2 text-sm text-slate-500">{projectTitle || "Solar Hybrid System Installation"}</p></div>
             <div className="mt-8"><OneLineDiagram /></div>
+            <label className="mt-5 block print:hidden"><span className="mb-2 block text-sm font-bold text-slate-700">Diagram အောက်မှတ်ချက် (ရွေးချယ်နိုင်သည်)</span><textarea value={diagramNotes} onChange={(event) => setDiagramNotes(event.target.value)} rows={3} className="w-full rounded-lg border border-slate-300 p-3 text-sm" placeholder="ဒီ Diagram နဲ့သက်ဆိုင်တဲ့ မှတ်ချက်ရေးရန်" /></label>
+            {diagramNotes.trim() && <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{diagramNotes}</p>}
           </article>
 
           {items.filter((item) => item.productId || item.mainImage || item.specificationImage).map((item) => (
@@ -569,8 +760,10 @@ export default function QuotationPage() {
               <Letterhead small companyTitle={companyTitle} companyAddress={companyAddress} companyPhone={companyPhone} servicePhone={servicePhone} />
               <div className="mt-8"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Product Specification</p><h2 className="mt-2 text-2xl font-black text-slate-900">{item.model || item.title}</h2><p className="mt-1 text-sm text-slate-500">{item.categoryTitle}{item.title && item.model ? ` · ${item.title}` : ""}</p>{item.warrantyTerm && <p className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">Warranty: {item.warrantyTerm}</p>}</div>
               {item.description && <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{item.description}</p>}
-              {item.mainImage && <div className="mt-6 grid min-h-40 place-items-center rounded-2xl border border-slate-200 bg-white p-5"><Image src={item.mainImage} alt={item.title} width={800} height={600} unoptimized className="max-h-[55mm] max-w-full object-contain" /></div>}
-              {item.specificationImage && <div className="mt-5 grid min-h-48 place-items-center rounded-2xl border border-slate-200 bg-white p-4"><Image src={item.specificationImage} alt={`${item.title} specification`} width={1200} height={1600} unoptimized className="max-h-[105mm] max-w-full object-contain" /></div>}
+              {(item.mainImage || item.specificationImage) && <div className={`mt-6 grid gap-4 ${item.mainImage && item.specificationImage ? "grid-cols-2" : "grid-cols-1"}`}>
+                {item.mainImage && <section className="quote-no-break rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-center text-xs font-bold text-slate-600">Product image</h3><div className="grid min-h-[95mm] place-items-center"><Image src={item.mainImage} alt={item.title} width={800} height={1000} unoptimized className="max-h-[100mm] max-w-full object-contain" /></div></section>}
+                {item.specificationImage && <section className="quote-no-break rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-center text-xs font-bold text-slate-600">Product specifications</h3><div className="grid min-h-[95mm] place-items-center"><Image src={item.specificationImage} alt={`${item.title} specification`} width={1200} height={1600} unoptimized className="max-h-[110mm] max-w-full object-contain" /></div></section>}
+              </div>}
               {!item.mainImage && !item.specificationImage && <div className="mt-8 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">Technical specification sheet is not available for this product in the website catalog.</div>}
               <p className="mt-5 text-xs text-slate-500">Specifications and product images are provided from the published SuntreeMyanmar website catalog. Product model warranty terms are shown as entered in the quotation.</p>
             </article>
@@ -578,7 +771,7 @@ export default function QuotationPage() {
 
           <article className="quote-print-page mx-auto my-5 min-h-[297mm] w-full max-w-[210mm] border border-slate-200 bg-white p-[10mm] shadow-sm print:my-0 print:border-0 print:shadow-none">
             <Letterhead small companyTitle={companyTitle} companyAddress={companyAddress} companyPhone={companyPhone} servicePhone={servicePhone} />
-            <div className="mt-7"><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Customer Care</p><h2 className="mt-2 text-3xl font-black text-slate-900">Warranty & After-Sales Service</h2><p className="mt-2 text-sm leading-6 text-slate-600">ယုံကြည်စိတ်ချစွာ အသုံးပြုနိုင်ရန် စနစ်တကျ အာမခံဝန်ဆောင်မှုနှင့် နည်းပညာအကူအညီများ ပေးအပ်ပါသည်။ အောက်ပါအချက်များသည် ရွေးချယ်ထားသော ပစ္စည်း Model နှင့် ထုတ်လုပ်သူ၏ အာမခံမူဝါဒအလိုက် အကျုံးဝင်ပါသည်။</p></div>
+            <div className="mt-7 flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Customer Care</p><h2 className="mt-2 text-3xl font-black text-slate-900">Warranty & After-Sales Service</h2><p className="mt-2 text-sm leading-6 text-slate-600">ယုံကြည်စိတ်ချစွာ အသုံးပြုနိုင်ရန် စနစ်တကျ အာမခံဝန်ဆောင်မှုနှင့် နည်းပညာအကူအညီများ ပေးအပ်ပါသည်။ အောက်ပါအချက်များသည် ရွေးချယ်ထားသော ပစ္စည်း Model နှင့် ထုတ်လုပ်သူ၏ အာမခံမူဝါဒအလိုက် အကျုံးဝင်ပါသည်။</p></div><button type="button" onClick={() => setWarrantyEditorOpen(true)} className="print:hidden inline-flex shrink-0 items-center gap-2 rounded-lg border border-emerald-700 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50"><Pencil size={15} /> စာသားပြင်ရန်</button></div>
             <div className="mt-6 space-y-4">{warrantyParagraphs.map((paragraph, index) => <section key={index} className="quote-no-break rounded-2xl border border-slate-200 bg-white p-5"><div className="mb-3 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-700 text-sm font-black text-white">0{index + 1}</span><h3 className="text-base font-black text-slate-900">{["Inverter နှင့် Circuit Protection", "Lithium Battery အာမခံ", "Installation နှင့် After-Sales Service"][index]}</h3></div><p className="whitespace-pre-line text-[12px] leading-7 text-slate-700">{paragraph}</p></section>)}</div>
             {paymentTerms && <div className="quote-no-break mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs leading-5"><strong>Payment terms / ငွေပေးချေမှုစည်းကမ်း</strong><p className="mt-1 whitespace-pre-line">{paymentTerms}</p></div>}
             <div className="quote-no-break mt-6 rounded-2xl bg-slate-50 p-5"><h3 className="font-bold text-slate-900">အာမခံဝန်ဆောင်မှု ရယူရန်</h3><p className="mt-2 text-sm leading-6 text-slate-700">Warranty claim တင်ရာတွင် ဝယ်ယူကြောင်းအထောက်အထား၊ Product Serial Number နှင့် Warranty Registration အချက်အလက်များကို ပြသပေးပါ။ စစ်ဆေးအတည်ပြုပြီးနောက် သက်ဆိုင်ရာ Warranty Policy အတိုင်း ဝန်ဆောင်မှုပေးပါမည်။</p></div>
@@ -586,6 +779,28 @@ export default function QuotationPage() {
           </article>
           </div>
         </div>
+        {letterheadEditorOpen && <>
+          <button type="button" aria-label="Close letterhead editor" onClick={() => setLetterheadEditorOpen(false)} className="fixed inset-0 z-40 bg-slate-950/35 print:hidden" />
+          <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl print:hidden sm:p-7">
+            <div className="mb-5 flex items-start justify-between gap-3"><div><h2 className="text-lg font-black text-slate-900">Letterhead အချက်အလက်ပြင်ရန်</h2><p className="mt-1 text-sm text-slate-500">ဒီအချက်အလက်တွေကို quotation PDF ရဲ့ ခေါင်းပိုင်းမှာ ဖော်ပြပါမယ်။</p></div><button type="button" onClick={() => setLetterheadEditorOpen(false)} aria-label="Close editor" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button></div>
+            <div className="space-y-4">
+              <label className="block text-sm font-bold text-slate-700">{language === "my" ? "ကုမ္ပဏီခေါင်းစဉ်" : "Company heading"}<input value={companyTitle} onChange={(event) => setCompanyTitle(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
+              <label className="block text-sm font-bold text-slate-700">{language === "my" ? "ကုမ္ပဏီလိပ်စာ" : "Company address"}<input value={companyAddress} onChange={(event) => setCompanyAddress(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
+              <label className="block text-sm font-bold text-slate-700">{language === "my" ? "ကုမ္ပဏီဖုန်း" : "Company phones"}<input value={companyPhone} onChange={(event) => setCompanyPhone(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
+              <label className="block text-sm font-bold text-slate-700">{language === "my" ? "Customer Service ဖုန်း" : "Customer service phone"}<input value={servicePhone} onChange={(event) => setServicePhone(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 font-normal" /></label>
+            </div>
+            <button type="button" onClick={() => setLetterheadEditorOpen(false)} className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white">ပြီးပါပြီ</button>
+          </aside>
+        </>}
+        {warrantyEditorOpen && <>
+          <button type="button" aria-label="Close warranty editor" onClick={() => setWarrantyEditorOpen(false)} className="fixed inset-0 z-40 bg-slate-950/35 print:hidden" />
+          <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl print:hidden sm:p-7">
+            <div className="mb-5 flex items-start justify-between gap-3"><div><h2 className="text-lg font-black text-slate-900">နောက်ဆုံးစာမျက်နှာ စာသားပြင်ရန်</h2><p className="mt-1 text-sm text-slate-500">ပြင်ပြီးသိမ်းထားသော စာသားများကို PDF မှာဖော်ပြပါမယ်။</p></div><button type="button" onClick={() => setWarrantyEditorOpen(false)} aria-label="Close editor" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button></div>
+            <label className="mb-5 block text-sm font-bold text-slate-700">Payment terms / ငွေပေးချေမှုစည်းကမ်း<textarea value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} rows={4} className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-sm font-normal leading-6" /></label>
+            <div className="space-y-4">{warrantyParagraphs.map((paragraph, index) => <label key={index} className="block text-sm font-bold text-slate-700">{["Inverter နှင့် Circuit Protection", "Lithium Battery", "Installation နှင့် After-Sales Service"][index]}<textarea value={paragraph} onChange={(event) => updateWarrantyParagraph(index, event.target.value)} rows={6} className="mt-1.5 w-full rounded-lg border border-slate-300 p-3 text-sm font-normal leading-6" /></label>)}</div>
+            <button type="button" onClick={() => setWarrantyEditorOpen(false)} className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white">ပြီးပါပြီ</button>
+          </aside>
+        </>}
       </main>
       <style jsx global>{`
         @media print {
