@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import DashboardShell from "@/components/layout/DashboardShell";
 import {
   ArrowRight,
   Boxes,
@@ -42,29 +44,23 @@ const API_BASE_URL = (
 ).replace(/\/+$/, "");
 
 export default function WarehousePage() {
+  const router = useRouter();
   const [authUser, setAuthUser] =
     useState<AuthUser | null>(null);
   const [summary, setSummary] = useState<MtkSummary | null>(null);
   const [summaryError, setSummaryError] = useState("");
 
   useEffect(() => {
-    try {
-      const storedUser =
-        localStorage.getItem("authUser");
-
-      if (!storedUser) return;
-
-      const user = JSON.parse(
-        storedUser,
-      ) as AuthUser;
-
-      setAuthUser(user);
-    } catch (error) {
-      console.error(
-        "Failed to read authUser:",
-        error,
-      );
-    }
+    const userRestore = window.setTimeout(() => {
+      try {
+        const storedUser = localStorage.getItem("authUser");
+        if (!storedUser) return;
+        setAuthUser(JSON.parse(storedUser) as AuthUser);
+      } catch (error) {
+        console.error("Failed to read authUser:", error);
+      }
+    }, 0);
+    return () => window.clearTimeout(userRestore);
   }, []);
 
   useEffect(() => {
@@ -194,7 +190,7 @@ export default function WarehousePage() {
   // ============================================================
 
   const goTo = (href: string) => {
-    window.location.href = href;
+    router.push(href);
   };
 
   // ============================================================
@@ -244,6 +240,7 @@ export default function WarehousePage() {
   // ============================================================
 
   return (
+    <DashboardShell>
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto min-h-screen max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
 
@@ -473,5 +470,6 @@ export default function WarehousePage() {
         </div>
       </div>
     </div>
+    </DashboardShell>
   );
 }

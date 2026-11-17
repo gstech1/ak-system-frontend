@@ -8,7 +8,7 @@ import {
   Boxes,
   ClipboardList,
   FileText,
-  Menu,
+  LayoutDashboard,
   Package,
   PackagePlus,
   RotateCcw,
@@ -32,6 +32,12 @@ const QUICK_ACTION = {
   title: "New Sale",
   href: "/warehouse/sales",
   icon: ShoppingCart,
+};
+
+const DASHBOARD_ITEM = {
+  title: "Dashboard",
+  href: "/warehouse",
+  icon: LayoutDashboard,
 };
 
 const MENU_SECTIONS: MenuSection[] = [
@@ -114,15 +120,12 @@ export default function MTKSolarSidebar() {
     useState<"en" | "my">("en");
 
   useEffect(() => {
-    const storedLanguage =
-      localStorage.getItem("dashboardLanguage");
-
-    if (
-      storedLanguage === "en" ||
-      storedLanguage === "my"
-    ) {
-      setLanguage(storedLanguage);
-    }
+    const languageRestore = window.setTimeout(() => {
+      const storedLanguage = localStorage.getItem("dashboardLanguage");
+      if (storedLanguage === "en" || storedLanguage === "my") {
+        setLanguage(storedLanguage);
+      }
+    }, 0);
 
     const handleLanguageChange = (
       event: Event,
@@ -139,6 +142,7 @@ export default function MTKSolarSidebar() {
     );
 
     return () => {
+      window.clearTimeout(languageRestore);
       window.removeEventListener(
         "dashboard-language-change",
         handleLanguageChange,
@@ -147,16 +151,6 @@ export default function MTKSolarSidebar() {
   }, []);
 
   const t = {
-    warehouse:
-      language === "my"
-        ? "ဂိုဒေါင်"
-        : "Warehouse",
-
-    warehouseStaff:
-      language === "my"
-        ? "ဂိုဒေါင်ဝန်ထမ်း"
-        : "Warehouse Staff",
-
     newSale:
       language === "my"
         ? "အရောင်းအသစ်"
@@ -232,6 +226,11 @@ export default function MTKSolarSidebar() {
         ? "အစီရင်ခံစာများ"
         : "Reports",
 
+    dashboard:
+      language === "my"
+        ? "ပင်မစာမျက်နှာ"
+        : "Dashboard",
+
     solarWarehouse:
       language === "my"
         ? "Solar ဂိုဒေါင်စနစ်"
@@ -242,15 +241,6 @@ export default function MTKSolarSidebar() {
         ? "အာမခံစနစ်"
         : "Warranty System",
 
-    warehouseManagement:
-      language === "my"
-        ? "ဂိုဒေါင်စီမံခန့်ခွဲမှုစနစ်"
-        : "Warehouse Management System",
-
-    warehouseMenu:
-      language === "my"
-        ? "ဂိုဒေါင်မီနူး"
-        : "Warehouse Menu",
   };
 
   const isActive = (href: string) => {
@@ -296,24 +286,11 @@ export default function MTKSolarSidebar() {
 
       </div>
 
-      {/* USER AREA */}
-      <div className="border-b border-slate-800 px-5 py-4">
-
-        <p className="text-xs uppercase tracking-wider text-slate-500">
-          {t.warehouse}
-        </p>
-
-        <p className="mt-1 font-semibold text-white">
-          {t.warehouseStaff}
-        </p>
-
-      </div>
-
       {/* NAVIGATION */}
       <nav className="flex-1 overflow-y-auto px-4 py-5">
 
-        {/* NEW SALE + MENU */}
-        <div className="mb-6 flex items-center gap-2">
+        {/* NEW SALE + DASHBOARD */}
+        <div className="mb-6 space-y-2">
 
           {/* NEW SALE */}
           <a
@@ -342,13 +319,18 @@ export default function MTKSolarSidebar() {
             </span>
           </a>
 
-          {/* MENU */}
+          {/* DASHBOARD */}
           <a
-            href="/warehouse"
-            title={t.warehouseMenu}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition-all hover:border-emerald-500 hover:bg-emerald-600 hover:text-white"
+            href={DASHBOARD_ITEM.href}
+            className={
+              "flex items-center gap-3 rounded-xl px-4 py-3 font-semibold transition-all " +
+              (isActive(DASHBOARD_ITEM.href)
+                ? "bg-emerald-600 text-white shadow-md"
+                : "text-slate-300 hover:bg-slate-800 hover:text-white")
+            }
           >
-            <Menu size={20} />
+            <LayoutDashboard size={18} />
+            <span>{t.dashboard}</span>
           </a>
 
         </div>
@@ -436,32 +418,18 @@ export default function MTKSolarSidebar() {
 
         </div>
 
-      </nav>
-
-      {/* FOOTER */}
-      <div className="border-t border-slate-800 p-5">
-
-        <div className="rounded-xl bg-slate-800 p-4">
-
-          <div className="flex items-center gap-2">
-
-            <Boxes
-              size={16}
-              className="text-emerald-400"
-            />
-
-            <p className="font-semibold text-white">
-              GS Art & Management</p></div><p className="mt-1 font-semibold text-white">
-  System
-</p>
-
-          <p className="mt-2 text-[11px] text-slate-500">
-            Version 1.0.0
-          </p>
-
+        {/* VERSION AT THE END OF THE SCROLLABLE MENU */}
+        <div className="mt-8 border-t border-slate-800 pt-5">
+          <div className="rounded-xl bg-slate-800 p-4">
+            <div className="flex items-center gap-2">
+              <Boxes size={16} className="text-emerald-400" />
+              <p className="font-semibold text-white">GS Art &amp; Management System</p>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">Version 1.0.0</p>
+          </div>
         </div>
 
-      </div>
+      </nav>
 
     </aside>
   );
