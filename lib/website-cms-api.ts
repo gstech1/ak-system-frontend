@@ -79,6 +79,22 @@ export type SaveQuotationPayload = {
   data: Record<string, unknown>;
 };
 
+export type QuotationCatalogItem = {
+  id: string;
+  group: "inverter" | "battery";
+  title: string;
+  model?: string;
+  description?: string;
+  mainImage?: string;
+  specificationImage?: string;
+  sourceProductId?: string;
+  isCustom: boolean;
+};
+
+export type SaveQuotationCatalogItemPayload = Omit<QuotationCatalogItem, "id" | "isCustom"> & {
+  id?: string;
+};
+
 async function quotationResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
@@ -124,6 +140,30 @@ export async function uploadQuotationImage(file: File) {
     method: "POST",
     headers: getWebsiteCmsAuthHeaders(),
     body: form,
+  }));
+}
+
+export async function getQuotationCatalogItems() {
+  return quotationResponse<QuotationCatalogItem[]>(await fetch(`${API_URL}/quotations/catalog`, {
+    headers: getWebsiteCmsAuthHeaders(),
+    cache: "no-store",
+  }));
+}
+
+export async function saveQuotationCatalogItem(payload: SaveQuotationCatalogItemPayload) {
+  const headers = new Headers(getWebsiteCmsAuthHeaders());
+  headers.set("Content-Type", "application/json");
+  const { id, ...data } = payload;
+  return quotationResponse<QuotationCatalogItem>(await fetch(
+    id ? `${API_URL}/quotations/catalog/${encodeURIComponent(id)}` : `${API_URL}/quotations/catalog`,
+    { method: id ? "PATCH" : "POST", headers, body: JSON.stringify(data) },
+  ));
+}
+
+export async function deleteQuotationCatalogItem(id: string) {
+  return quotationResponse<{ success: boolean }>(await fetch(`${API_URL}/quotations/catalog/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: getWebsiteCmsAuthHeaders(),
   }));
 }
 
