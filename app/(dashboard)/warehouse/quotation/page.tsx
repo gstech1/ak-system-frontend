@@ -659,7 +659,7 @@ export default function QuotationPage() {
                 })}
               </div>
               {canManageCatalog && catalogEditorOpen && <div className="mt-5 space-y-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Inverter / Battery အမည်စာရင်း</h3><p className="mt-1 text-xs text-slate-600">ဒီနေရာမှာ ပြင်/ထည့်ထားတဲ့အမည်တွေကို အသုံးပြုသူအားလုံး မြင်ရပါမယ်။</p></div><button type="button" onClick={() => setCatalogEditorOpen(false)} aria-label="Close product editor" className="rounded-lg p-2 text-slate-500 hover:bg-white"><X size={18} /></button></div>
+                <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Inverter / Battery အမည်စာရင်း</h3><p className="mt-1 text-xs text-slate-600">Website စာရင်းအစဉ်အတိုင်း ပစ္စည်းပုံနဲ့ Spec ပုံကို ဘေးမှာတွဲပြထားပါတယ်။ ပုံကြည့်ပြီး အမည်/Model ဖြည့်ကာ သိမ်းပါ။</p></div><button type="button" onClick={() => setCatalogEditorOpen(false)} aria-label="Close product editor" className="rounded-lg p-2 text-slate-500 hover:bg-white"><X size={18} /></button></div>
                 {catalogManagementError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{catalogManagementError}</p>}
                 {catalogManagementMessage && <p className="rounded-lg border border-emerald-200 bg-white p-3 text-sm text-emerald-800">{catalogManagementMessage}</p>}
                 {catalogManagementError && catalogManagementError.toLowerCase().includes("forbidden") && <p className="text-xs text-slate-600">ထုတ်ကုန်အမည် စီမံခွင့်ကို Admin, Boss, Manager များအတွက်သာ ဖွင့်ထားပါသည်။</p>}
@@ -667,7 +667,17 @@ export default function QuotationPage() {
                   <h4 className="text-sm font-bold text-emerald-900">{group === "inverter" ? "Inverter" : "Battery System"}</h4>
                   {catalogProducts.filter((product) => product.categoryGroup === group).map((product) => {
                     const draft = catalogDrafts[product.id] || { title: product.title, model: product.catalogModel || "" };
-                    return <div key={product.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+                    return <div key={product.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+                      <div className="flex gap-2">
+                        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                          {product.mainImage ? <Image src={getWebsiteCmsImageUrl(product.mainImage)} alt={`${product.title} product image`} width={96} height={72} unoptimized className="h-[68px] w-full rounded border border-slate-200 bg-white object-contain" /> : <div className="grid h-[68px] w-full place-items-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">ပုံမရှိ</div>}
+                          <span className="text-[10px] text-slate-500">ပစ္စည်းပုံ</span>
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                          {product.specificationImage ? <Image src={getWebsiteCmsImageUrl(product.specificationImage)} alt={`${product.title} specification image`} width={96} height={72} unoptimized className="h-[68px] w-full rounded border border-slate-200 bg-white object-contain" /> : <div className="grid h-[68px] w-full place-items-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">Spec မရှိ</div>}
+                          <span className="text-[10px] text-slate-500">Spec ပုံ</span>
+                        </div>
+                      </div>
                       <input value={draft.title} onChange={(event) => setCatalogDrafts((current) => ({ ...current, [product.id]: { ...draft, title: event.target.value } }))} className="h-10 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" aria-label={`${product.title} product name`} placeholder="ထုတ်ကုန်အမည်" />
                       <input value={draft.model} onChange={(event) => setCatalogDrafts((current) => ({ ...current, [product.id]: { ...draft, model: event.target.value } }))} className="h-10 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" aria-label={`${product.title} model`} placeholder="Model (မဖြည့်လည်းရ)" />
                       <button type="button" onClick={() => void saveManagedCatalogProduct(product)} disabled={catalogSavingId === product.id} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50"><Save size={15} /> သိမ်း</button>
