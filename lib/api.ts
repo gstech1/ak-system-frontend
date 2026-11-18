@@ -1531,6 +1531,43 @@ export async function assignShipmentSerials(
   return await response.json();
 }
 
+export async function correctShipmentSerialRange(
+  shipmentId: string,
+  payload: {
+    shipmentItemId: string;
+    startSerial: string;
+    endSerial: string;
+    reason: string;
+  },
+): Promise<{
+  shipmentId: string;
+  shipmentNo: string;
+  shipmentItemId: string;
+  oldSerialNumbers: string[];
+  newSerialNumbers: string[];
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/shipments/${shipmentId}/serial-range`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      errorData?.message || "Unable to correct shipment serial range.",
+    );
+  }
+
+  return await response.json();
+}
+
 export async function generateShipmentSerials(
   shipmentItemId: string,
   data: GenerateSerialsInput,

@@ -3,12 +3,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Printer } from "lucide-react";
+import { Pencil, Printer, X } from "lucide-react";
 
 import DashboardShell from "@/components/layout/DashboardShell";
 import PageTitle from "@/components/common/PageTitle";
 import {
   assignShipmentSerials,
+  correctShipmentSerialRange,
   getShipment,
   getWarrantyExtensionRequestsForShipment,
   reviewWarrantyExtensionRequest,
@@ -18,6 +19,7 @@ import {
   type ShipmentSerial,
   type WarrantyExtensionRequest,
 } from "@/lib/api";
+import { getCurrentAuthUser } from "@/lib/current-user";
 import { printThermalReceipt } from "@/lib/thermalReceipt";
 
 function formatDate(value?: string | null) {
@@ -28,6 +30,14 @@ function formatDate(value?: string | null) {
         year: "numeric",
       })
     : "—";
+}
+
+function normalizeSerialInput(value: string) {
+  return value.replace(/\D/g, '').slice(0, 9);
+}
+
+function formatSerial(value: string) {
+  return normalizeSerialInput(value).replace(/(\d{3})(?=\d)/g, '$1 ');
 }
 
 function addMonths(value: string | null | undefined, months: number) {
@@ -126,9 +136,17 @@ export default function ShipmentDetailsPage() {
   const [savingReminder, setSavingReminder] = useState(false);
   const [extensionRequests, setExtensionRequests] = useState<WarrantyExtensionRequest[]>([]);
   const [reviewingExtension, setReviewingExtension] = useState("");
+  const [canCorrectShipmentSerials, setCanCorrectShipmentSerials] = useState(false);
+  const [editingSerialItemId, setEditingSerialItemId] = useState("");
+  const [correctionStartSerial, setCorrectionStartSerial] = useState("");
+  const [correctionEndSerial, setCorrectionEndSerial] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [savingSerialCorrection, setSavingSerialCorrection] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const role = String(getCurrentAuthUser()?.role ?? "").toUpperCase();
+    setCanCorrectShipmentSerials(["ADMIN", "BOSS", "MANAGER"].includes(role));
 
     async function loadShipment() {
       try {
@@ -236,6 +254,60 @@ export default function ShipmentDetailsPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openSerialCorrection(item: NonNullable<Shipment["items"]>[number]) {
+    const serials = [...(item.serials ?? [])].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+    if (serials.length === 0) return;
+    setEditingSerialItemId(item.id);
+    setCorrectionStartSerial(serials[0].serialNumber);
+    setCorrectionEndSerial(serials[serials.length - 1].serialNumber);
+    setCorrectionReason("");
+    setError("");
+    setSuccess("");
+  }
+
+  async function saveSerialCorrection(event: FormEvent<HTMLFormElement>, item: NonNullable<Shipment["items"]>[number]) {
+    event.preventDefault();
+    if (!shipment) return;
+
+    const start = normalizeSerialInput(correctionStartSerial);
+    const end = normalizeSerialInput(correctionEndSerial);
+    const expectedCount = item.serials?.length ?? 0;
+    const actualCount = start.length === 9 && end.length === 9
+      ? Number(end) - Number(start) + 1
+      : 0;
+
+    if (actualCount !== expectedCount || correctionReason.trim().length < 10) {
+      setError(`Serial အရေအတွက်ကို ${expectedCount} လုံးတိတိထားပြီး အကြောင်းပြချက်ကို အနည်းဆုံး ၁၀ လုံးရေးပါ။`);
+      return;
+    }
+
+    const sortedCurrent = [...(item.serials ?? [])].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+    const oldRange = `${formatSerial(sortedCurrent[0]?.serialNumber ?? "")} – ${formatSerial(sortedCurrent[sortedCurrent.length - 1]?.serialNumber ?? "")}`;
+    const newRange = `${formatSerial(start)} – ${formatSerial(end)}`;
+    if (!window.confirm(
+      `${shipment.shipmentNo} မှာ serial ${expectedCount} လုံးကို\n${oldRange}\nမှ\n${newRange}\nသို့ ပြောင်းပါမယ်။ အဟောင်းတွေ warehouse stock ထဲပြန်ဝင်ပြီး အသစ်တွေကို ဒီ shipment ထဲသတ်မှတ်ပါမယ်။ ဆက်လုပ်မလား?`,
+    )) return;
+
+    try {
+      setSavingSerialCorrection(true);
+      setError("");
+      setSuccess("");
+      const result = await correctShipmentSerialRange(shipment.id, {
+        shipmentItemId: item.id,
+        startSerial: start,
+        endSerial: end,
+        reason: correctionReason.trim(),
+      });
+      setShipment(await getShipment(shipment.id));
+      setEditingSerialItemId("");
+      setSuccess(`${result.newSerialNumbers.length} serial များကို ${shipment.shipmentNo} မှာ ပြင်ဆင်ပြီးပါပြီ။`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Shipment serial များကို ပြင်မရပါ။");
+    } finally {
+      setSavingSerialCorrection(false);
     }
   }
 
@@ -386,13 +458,25 @@ export default function ShipmentDetailsPage() {
               ) : (
                 (shipment.items ?? []).map((item) => (
                   <div key={item.id} className="space-y-2">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="font-semibold text-slate-900">
                         {item.product?.name ?? "Product"}
                       </h3>
-                      <p className="text-xs text-slate-500">
-                        {item.product?.productCode ?? "—"} · {item.serials?.length ?? 0} serial(s)
-                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <p className="text-xs text-slate-500">
+                          {item.product?.productCode ?? "—"} · {item.serials?.length ?? 0} serial(s)
+                        </p>
+                        {canCorrectShipmentSerials && shipment.status === "COMPLETED" && (item.serials?.length ?? 0) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => editingSerialItemId === item.id ? setEditingSerialItemId("") : openSerialCorrection(item)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Serial range ပြင်ရန်
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {(item.serials ?? []).length === 0 ? (
@@ -466,6 +550,74 @@ export default function ShipmentDetailsPage() {
                           </tbody>
                         </table>
                       </div>
+                    )}
+
+                    {editingSerialItemId === item.id && (
+                      <form
+                        onSubmit={(event) => saveSerialCorrection(event, item)}
+                        className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4"
+                      >
+                        <div>
+                          <h4 className="font-semibold text-slate-900">Shipment serial range ပြင်ဆင်ရန်</h4>
+                          <p className="mt-1 text-xs leading-5 text-slate-600">
+                            လက်ရှိ {item.serials?.length ?? 0} လုံးကို အရေအတွက်တူညီသော warehouse ထဲက serial အသစ်ဖြင့် အစားထိုးပါမည်။ သုံးပြီးသား serial များကို စနစ်က လက်မခံပါ။
+                          </p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="space-y-1 text-xs font-semibold text-slate-700">
+                            <span>အစ serial</span>
+                            <input
+                              value={correctionStartSerial}
+                              onChange={(event) => setCorrectionStartSerial(event.target.value)}
+                              onBlur={() => setCorrectionStartSerial(formatSerial(correctionStartSerial))}
+                              inputMode="numeric"
+                              autoComplete="off"
+                              placeholder="000 000 749"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                            />
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-slate-700">
+                            <span>အဆုံး serial</span>
+                            <input
+                              value={correctionEndSerial}
+                              onChange={(event) => setCorrectionEndSerial(event.target.value)}
+                              onBlur={() => setCorrectionEndSerial(formatSerial(correctionEndSerial))}
+                              inputMode="numeric"
+                              autoComplete="off"
+                              placeholder="000 000 758"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                            />
+                          </label>
+                        </div>
+                        <label className="block space-y-1 text-xs font-semibold text-slate-700">
+                          <span>ပြင်ဆင်ရသည့်အကြောင်းရင်း</span>
+                          <textarea
+                            value={correctionReason}
+                            onChange={(event) => setCorrectionReason(event.target.value)}
+                            rows={2}
+                            maxLength={500}
+                            placeholder="ဥပမာ - shipment တွင် serial range မှားထည့်မိ၍ အမှန်အတိုင်းပြင်ဆင်ခြင်း"
+                            className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                          />
+                        </label>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSerialItemId("")}
+                            disabled={savingSerialCorrection}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            <X className="h-3.5 w-3.5" /> ပယ်ဖျက်
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingSerialCorrection || normalizeSerialInput(correctionStartSerial).length !== 9 || normalizeSerialInput(correctionEndSerial).length !== 9 || correctionReason.trim().length < 10}
+                            className="rounded-lg bg-amber-700 px-4 py-2 text-xs font-bold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {savingSerialCorrection ? "ပြင်ဆင်နေသည်…" : "အတည်ပြုပြင်ရန်"}
+                          </button>
+                        </div>
+                      </form>
                     )}
                   </div>
                 ))
